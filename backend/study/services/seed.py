@@ -1,3 +1,8 @@
+from ..core.security import hash_password, new_key
+from ..db.codec import encode
+from ..db.repositories import plans as plans_repo, users as users_repo
+from ..schemas.auth import Preferences
+
 BUILTINS = [
     dict(id=key, name=name, builtin=True, archived=False)
     for key, name in [
@@ -37,12 +42,12 @@ ROWS = [
 ]
 
 
-def minutes(value):
+def minutes(value: str) -> int:
     hour, minute = map(int, value.split(':'))
     return hour * 60 + minute
 
 
-def default_tasks():
+def default_tasks() -> list[dict]:
     names = {c['id']: c['name'] for c in BUILTINS}
     return [
         dict(
@@ -57,3 +62,17 @@ def default_tasks():
         )
         for i, (start, end, category, title) in enumerate(ROWS, 1)
     ]
+
+
+def create_user(db, *, username: str, password: str, role: str, must_change: bool, today: str, now: int) -> int:
+    user_id = users_repo.insert(
+        db,
+        username=username,
+        password_hash=hash_password(password),
+        role=role,
+        must_change=must_change,
+        preferences_json=encode(Preferences().model_dump()),
+        categories_json=encode(BUILTINS),
+    )
+    plans_repo.insert(db, user_id, new_key(), today, now, encode(default_tasks()))
+    return user_id

@@ -6,13 +6,16 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .models import NewUser
-from .store import Store, create_user
+from .core.config import BACKEND_ROOT, Settings
+from .db.connection import Store
+from .db.repositories import users as users_repo
+from .schemas.admin import NewUser
+from .services.seed import create_user
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = BACKEND_ROOT
 
 
-def configured_user(prefix):
+def configured_user(prefix: str):
     username = os.environ.get(f'{prefix}_USERNAME')
     password = os.environ.get(f'{prefix}_PASSWORD')
     if username is None and password is None:
@@ -23,18 +26,18 @@ def configured_user(prefix):
         raise RuntimeError(f'{prefix}_USERNAME / {prefix}_PASSWORD 配置无效') from None
 
 
-def prepare(directory=None):
-    directory = Path(directory or os.environ.get('STUDY_DATA_DIR') or ROOT / 'data')
+def prepare(directory=None) -> Path:
+    settings = Settings.from_env(directory)
     admin = configured_user('STUDY_ADMIN')
     member = configured_user('STUDY_MEMBER')
     if admin and member and admin.username == member.username:
         raise RuntimeError('初始管理员和学习账号必须使用不同的用户名')
-    store = Store(directory)
-    store.initialize(os.environ.get('STUDY_TIMEZONE', 'Asia/Shanghai'))
+    store = Store(settings.data_dir)
+    store.initialize(settings.timezone)
     now = int(time.time())
     today = store.date(now).isoformat()
     with store.transaction(write=True) as db:
-        if admin and not db.execute("SELECT 1 FROM users WHERE role='admin'").fetchone():
+        if admin and not users_repo.has_admin(db):
             create_user(
                 db,
                 username=admin.username,
@@ -44,7 +47,7 @@ def prepare(directory=None):
                 today=today,
                 now=now,
             )
-        if member and not db.execute('SELECT 1 FROM users WHERE username=?', (member.username,)).fetchone():
+        if member and not users_repo.get_by_username(db, member.username):
             create_user(
                 db,
                 username=member.username,
@@ -54,7 +57,7 @@ def prepare(directory=None):
                 today=today,
                 now=now,
             )
-    return directory
+    return settings.data_dir
 
 
 if __name__ == '__main__':
