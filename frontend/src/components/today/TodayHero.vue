@@ -73,8 +73,14 @@ function onCheckInClick(event: MouseEvent) {
         <span v-else-if="checked" class="pill success" style="padding: 7px 12px; font-size: 12.5px">
           <CheckCircle2 :size="14" />当日已打卡
         </span>
-        <button type="button" class="btn secondary lg pill share-btn" @click="emit('share')">
-          <Share2 :size="15" />分享海报
+        <button
+          type="button"
+          class="btn secondary lg share-btn"
+          aria-label="分享海报"
+          title="分享海报"
+          @click="emit('share')"
+        >
+          <Share2 :size="16" />
         </button>
       </div>
     </div>
@@ -160,6 +166,14 @@ function onCheckInClick(event: MouseEvent) {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+.share-btn {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  flex: none;
 }
 .checkin-btn.is-celebrating {
   animation: checkin-btn-pulse 0.54s var(--ease-spring);
@@ -255,6 +269,11 @@ function onCheckInClick(event: MouseEvent) {
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
+  }
+  .share-btn {
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
   }
   .hero-rings {
     display: grid;

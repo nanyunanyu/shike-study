@@ -202,21 +202,22 @@ function scrollToNow() {
                   <p v-if="task.note" class="task-note muted">{{ task.note }}</p>
                 </div>
                 <div class="task-meta-row">
-                  <CategoryBadge :id="task.category" :name="task.category_name" />
-                  <span v-if="task.adhoc" class="adhoc-badge"><Sparkles :size="10" />临时</span>
-                  <span v-if="task.estimate" class="tertiary meta-est tabular">约 {{ task.estimate }} 分钟</span>
-                  <span v-if="task.override" class="accent-text meta-est">已调时段</span>
+                  <div class="task-meta-tags">
+                    <CategoryBadge :id="task.category" :name="task.category_name" />
+                    <span v-if="task.adhoc" class="adhoc-badge"><Sparkles :size="10" />临时</span>
+                    <span v-if="task.estimate" class="tertiary meta-est tabular">约 {{ task.estimate }} 分钟</span>
+                    <span v-if="task.override" class="accent-text meta-est">已调时段</span>
+                  </div>
+                  <DayTaskActions
+                    v-if="editable"
+                    :task="task"
+                    @edit-times="emit('editTimes', $event)"
+                    @edit-adhoc="emit('editAdhoc', $event)"
+                    @delete-adhoc="emit('deleteAdhoc', $event)"
+                    @focus="emit('focus', $event)"
+                  />
                 </div>
               </div>
-
-              <DayTaskActions
-                v-if="editable"
-                :task="task"
-                @edit-times="emit('editTimes', $event)"
-                @edit-adhoc="emit('editAdhoc', $event)"
-                @delete-adhoc="emit('deleteAdhoc', $event)"
-                @focus="emit('focus', $event)"
-              />
             </div>
           </article>
         </div>
@@ -512,8 +513,17 @@ function scrollToNow() {
 .task-meta-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.task-meta-tags {
+  display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
 }
 .meta-est {
   font-size: 11.5px;
@@ -672,7 +682,7 @@ function scrollToNow() {
   .task-card {
     display: grid;
     grid-template-columns: 20px minmax(0, 1fr);
-    grid-template-rows: auto auto auto;
+    grid-template-rows: auto auto;
     align-items: start;
     gap: 0 9px;
     padding: 10px 11px;
@@ -719,30 +729,23 @@ function scrollToNow() {
     min-width: 0;
     margin-top: 7px;
     gap: 6px;
-    flex-wrap: wrap;
-    overflow: visible;
+    align-items: center;
+  }
+  .task-meta-tags {
+    gap: 5px;
   }
   .meta-est {
     font-size: 11px;
     white-space: nowrap;
   }
-  .task-card :deep(.task-actions) {
-    grid-column: 2;
-    grid-row: 3;
-    width: 100%;
-    justify-content: flex-end;
-    margin-top: 8px;
-    padding-top: 7px;
-    border-top: 1px solid var(--border);
-  }
   .clean-list {
     gap: 7px;
   }
   .list-item {
-    grid-template-columns: 20px auto minmax(0, 1fr);
-    grid-template-rows: auto auto auto;
+    grid-template-columns: 20px auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
     align-items: start;
-    gap: 0 9px;
+    gap: 0 8px;
     padding: 10px 11px;
     border-radius: 14px;
   }
@@ -774,20 +777,20 @@ function scrollToNow() {
   .list-meta {
     grid-column: 3;
     grid-row: 2;
+    min-width: 0;
     justify-self: start;
     align-self: center;
     margin-top: 7px;
+    gap: 5px;
     flex-wrap: wrap;
     max-width: 100%;
   }
   .list-item :deep(.task-actions) {
-    grid-column: 2 / -1;
-    grid-row: 3;
-    width: 100%;
-    justify-content: flex-end;
-    margin-top: 8px;
-    padding-top: 7px;
-    border-top: 1px solid var(--border);
+    grid-column: 4;
+    grid-row: 2;
+    align-self: center;
+    justify-self: end;
+    margin-top: 7px;
   }
 }
 </style>

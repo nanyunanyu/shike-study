@@ -3,13 +3,15 @@ import { fetchDay } from '@/api/days'
 import { fetchTimerApi, postTimerActionApi, postTimerStartApi } from '@/api/timer'
 import { bumpLearningRevision, session, sessionEpoch, today } from '@/stores/session'
 import { notify } from '@/stores/ui'
-import type { Mode, Timer, TimerAction, TimerResponse } from '@/types'
+import type { FocusTask, Mode, Timer, TimerAction, TimerResponse } from '@/types'
 
 export const timer = shallowRef<Timer | null>(null)
 export const clock = ref(0)
 export const timerReady = ref(false)
 export const timerBusy = ref(false)
 export const focusCompletion = ref<string | null>(null)
+export const draftTask = shallowRef<FocusTask | null>(null)
+export const floatingClockOpen = ref(false)
 
 let lastServerTime = 0
 let syncedAt = 0
@@ -34,6 +36,8 @@ watch(
     timerBusy.value = false
     pendingStart = null
     focusCompletion.value = null
+    draftTask.value = null
+    floatingClockOpen.value = false
     resetFocusObservation()
   },
   { flush: 'sync' },
@@ -96,7 +100,10 @@ function updateTimer(result: TimerResponse) {
   if (previous?.stage === 'focus' && (result.timer?.stage !== 'focus' || result.timer.id !== previous.id)) {
     bumpLearningRevision()
   }
-  if (today.value && result.today !== today.value) bumpLearningRevision()
+  if (today.value && result.today !== today.value) {
+    bumpLearningRevision()
+    draftTask.value = null
+  }
   today.value = result.today
   timer.value = result.timer
   timerReady.value = true
@@ -176,12 +183,33 @@ async function runTimerMutation(request: () => Promise<TimerResponse>) {
   }
 }
 
+export function setDraftTask(task: FocusTask | null) {
+  draftTask.value = task
+    ? {
+        id: task.id,
+        title: task.title,
+        category: task.category,
+        category_name: task.category_name,
+      }
+    : null
+}
+
+export function focusTaskInFloatingClock(task: FocusTask) {
+  if (!timer.value) {
+    setDraftTask(task)
+  } else if (timer.value.task?.id !== task.id) {
+    notify('当前已有进行中的专注计时')
+  }
+  floatingClockOpen.value = true
+}
+
 export async function startTimer(mode: Mode, task: string | null, minutes?: number) {
   const signature = JSON.stringify([today.value, mode, task, minutes])
   if (pendingStart?.signature !== signature) pendingStart = { signature, id: crypto.randomUUID() }
   const id = pendingStart.id
   if (await runTimerMutation(() => postTimerStartApi({ id, date: today.value, mode, task_id: task, minutes }))) {
     pendingStart = null
+    if (!task) draftTask.value = null
   }
 }
 

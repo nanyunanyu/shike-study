@@ -20,6 +20,7 @@ const emit = defineEmits<{
     <button
       type="button"
       class="icon-btn sm"
+      :aria-label="task.adhoc ? '编辑临时任务' : '调整当天时段'"
       :title="task.adhoc ? '编辑临时任务' : '调整当天时段'"
       @click="task.adhoc ? emit('editAdhoc', task) : emit('editTimes', task)"
     >
@@ -28,16 +29,18 @@ const emit = defineEmits<{
     <button
       type="button"
       class="icon-btn sm accent-btn focus-action-btn"
+      data-floating-clock-trigger
+      :aria-label="focusTitle ?? '为此任务开启专注'"
       :title="focusTitle ?? '为此任务开启专注'"
       @click="emit('focus', task)"
     >
       <Play :size="13" />
-      <span class="focus-label">专注</span>
     </button>
     <button
       v-if="task.adhoc"
       type="button"
       class="icon-btn sm danger-ghost"
+      aria-label="删除临时任务"
       title="删除临时任务"
       @click="emit('deleteAdhoc', task)"
     >
@@ -50,19 +53,25 @@ const emit = defineEmits<{
 .task-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   flex: none;
 }
-.accent-btn:hover:not(:disabled) {
+.focus-action-btn {
+  border-radius: var(--radius-pill);
   background: var(--accent-soft);
+  border-color: var(--accent-border);
   color: var(--accent);
 }
-.focus-label {
-  display: none;
+.focus-action-btn:hover:not(:disabled) {
+  background: var(--accent-soft-strong);
+  color: var(--accent);
+}
+.focus-action-btn :deep(svg) {
+  transform: translateX(0.5px);
 }
 @media (max-width: 768px) {
   .task-actions {
-    gap: 5px;
+    gap: 4px;
   }
   .task-actions .icon-btn.sm {
     width: 28px;
@@ -70,19 +79,7 @@ const emit = defineEmits<{
     border-radius: 8px;
   }
   .task-actions .icon-btn.sm.focus-action-btn {
-    width: auto;
-    height: 28px;
-    padding: 0 10px;
-    gap: 4px;
     border-radius: var(--radius-pill);
-    background: var(--accent-soft);
-    border-color: var(--accent-border);
-    color: var(--accent);
-    font-size: 11.5px;
-    font-weight: 600;
-  }
-  .focus-label {
-    display: inline;
   }
 }
 </style>

@@ -11,8 +11,9 @@ const props = withDefaults(
     busy?: boolean
     drawer?: boolean
     wide?: boolean
+    centered?: boolean
   }>(),
-  { busy: false, drawer: false, wide: false },
+  { busy: false, drawer: false, wide: false, centered: false },
 )
 
 const emit = defineEmits<{
@@ -67,7 +68,7 @@ onUnmounted(() => {
       <div
         v-if="modelValue"
         class="glass-overlay"
-        :class="{ 'is-drawer': drawer }"
+        :class="{ 'is-drawer': drawer, 'is-centered': centered }"
         role="presentation"
         @click.self="close"
       >
@@ -212,6 +213,11 @@ onUnmounted(() => {
     padding: 12px 10px max(10px, env(safe-area-inset-bottom));
     align-items: end;
   }
+  .glass-overlay.is-centered {
+    align-items: center;
+    justify-items: center;
+    padding: max(20px, env(safe-area-inset-top)) 14px max(20px, env(safe-area-inset-bottom));
+  }
   .glass-overlay.is-drawer {
     align-items: flex-end;
     justify-content: center;
@@ -219,6 +225,11 @@ onUnmounted(() => {
   }
   .glass-dialog {
     max-height: calc(100dvh - 24px);
+    border-radius: 22px;
+  }
+  .glass-overlay.is-centered .glass-dialog {
+    width: min(100%, 480px);
+    max-height: min(78dvh, calc(100dvh - 48px));
     border-radius: 22px;
   }
   .glass-dialog.drawer {

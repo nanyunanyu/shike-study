@@ -22,7 +22,7 @@ import MessageCenter from '@/components/messages/MessageCenter.vue'
 import FloatingClock from '@/components/timer/FloatingClock.vue'
 import PageSkeleton from '@/components/ui/PageSkeleton.vue'
 import { session, setSession } from '@/stores/session'
-import { focusCompletion, resetFocusObservation, syncTimer, tickClock } from '@/stores/timer'
+import { floatingClockOpen, focusCompletion, resetFocusObservation, syncTimer, tickClock } from '@/stores/timer'
 import { notify, toast } from '@/stores/ui'
 import { playCompletionChime } from '@/utils/soundscape'
 
@@ -32,10 +32,10 @@ const route = useRoute()
 const checking = ref(true)
 const initialized = ref(true)
 const startupProblem = ref('')
+const mobileTopBar = ref<InstanceType<typeof MobileTopBar> | null>(null)
 const mobileDock = ref<InstanceType<typeof MobileDock> | null>(null)
 const messages = ref<InstanceType<typeof MessageCenter> | null>(null)
 const toastRef = ref<InstanceType<typeof StudioToast> | null>(null)
-const clockPanelOpen = ref(false)
 
 const unread = computed(() => messages.value?.unread ?? 0)
 const clockAccount = computed(() => (session.value ? `${session.value.user.id}:${session.value.user.username}` : ''))
@@ -57,17 +57,23 @@ let completionToast = -1
 watch(focusCompletion, id => {
   if (id) {
     playCompletionChime()
-    if (!clockPanelOpen.value || route.name === 'timer') {
+    if (!floatingClockOpen.value || route.name === 'timer') {
       notify('本轮专注已完成，已自动记入专注统计')
       completionToast = toast.version
     }
   }
 })
 
-function clockOpenChanged(open: boolean) {
-  clockPanelOpen.value = open
+watch(floatingClockOpen, open => {
   if (open && completionToast === toast.version) toastRef.value?.hide()
-}
+})
+
+watch(
+  () => route.name,
+  name => {
+    if (name === 'timer') floatingClockOpen.value = false
+  },
+)
 
 watch([session, () => route.meta.requiresAdmin], () => {
   if (session.value && session.value.user.role !== 'admin' && route.meta.requiresAdmin) {
@@ -152,7 +158,7 @@ onUnmounted(() => {
   <div v-else class="studio-shell">
     <AppSidebar :nav-items="navItems" :unread="unread" @open-inbox="messages?.showInbox()" />
 
-    <MobileTopBar :unread="unread" @open-inbox="messages?.showInbox()" />
+    <MobileTopBar ref="mobileTopBar" :unread="unread" @open-inbox="messages?.showInbox()" />
 
     <main id="main-content" class="studio-main" tabindex="-1">
       <RouterView v-slot="{ Component, route: current }">
@@ -172,8 +178,8 @@ onUnmounted(() => {
       v-if="route.name !== 'timer'"
       :key="clockAccount"
       :account="clockAccount"
+      :top-bar="mobileTopBar?.el ?? null"
       :bottom-nav="mobileDock?.el ?? null"
-      @open-change="clockOpenChanged"
     />
 
     <MessageCenter
@@ -181,7 +187,7 @@ onUnmounted(() => {
       ref="messages"
       :key="session.csrf"
       :timezone="session.timezone"
-      :clock-open="clockPanelOpen"
+      :clock-open="floatingClockOpen"
     />
   </div>
 

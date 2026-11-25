@@ -162,7 +162,7 @@ defineExpose({ sync, showInbox, unread })
 <template>
   <MessageFloatNotice :visible="showFloat" :preview="pendingPreview" @open="showInbox" @dismiss="pendingPreview = null" />
 
-  <GlassModal v-model="open" title="消息中心" subtitle="来自管理员的提醒与鼓励" :busy="deleting" drawer>
+  <GlassModal v-model="open" title="消息中心" subtitle="来自管理员的提醒与鼓励" :busy="deleting" centered>
     <div v-if="deleteTarget" class="delete-box glass-inset">
       <p>确定从消息中心删除这条消息？</p>
       <p v-if="deleteError" class="error-text" role="alert">{{ deleteError }}</p>

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { BookMarked, CalendarDays, ChevronLeft, ChevronRight, NotebookPen } from 'lucide-vue-next'
 import ReviewCard from '@/components/reviews/ReviewCard.vue'
 import ShareCardModal from '@/components/share/ShareCardModal.vue'
@@ -14,6 +13,7 @@ import PageSkeleton from '@/components/ui/PageSkeleton.vue'
 import { useMotionCue } from '@/composables/useMotionCue'
 import { useTodayDay } from '@/composables/useTodayDay'
 import { preferences, session, today } from '@/stores/session'
+import { draftTask, focusTaskInFloatingClock, setDraftTask } from '@/stores/timer'
 import { clearCheckInCelebration, triggerCheckInCelebration, updateCheckInCelebrationStreak } from '@/stores/ui'
 import type { AdhocTaskPayload, DayTask, Times } from '@/types'
 import { resolveStreakMilestone, type CelebrationOrigin } from '@/utils/celebrationEngine'
@@ -21,7 +21,6 @@ import { currentHHMM, greetingForHour, labelDate } from '@/utils/date'
 import { buildSharePayloadFromDay } from '@/utils/sharePayload'
 import { playCheckInChime } from '@/utils/soundscape'
 
-const router = useRouter()
 const taskCue = useMotionCue<string>(320)
 const checkInPulse = useMotionCue<boolean>(560)
 
@@ -110,11 +109,24 @@ function openEditAdhoc(task: DayTask) {
 }
 
 async function handleSubmitAdhoc(payload: AdhocTaskPayload, editingId: string | null) {
-  if (await saveAdhoc(payload, editingId)) adhocOpen.value = false
+  if (await saveAdhoc(payload, editingId)) {
+    if (editingId && draftTask.value?.id === editingId) {
+      const updated = day.value?.tasks.find(t => t.id === editingId)
+      if (updated) setDraftTask(updated)
+    }
+    adhocOpen.value = false
+  }
+}
+
+async function handleDeleteAdhoc(task: DayTask) {
+  await removeAdhoc(task)
+  if (draftTask.value?.id === task.id && !day.value?.tasks.some(t => t.id === task.id)) {
+    setDraftTask(null)
+  }
 }
 
 function focusTask(task: DayTask) {
-  void router.push({ name: 'timer', query: { task: task.id } })
+  focusTaskInFloatingClock(task)
 }
 </script>
 
@@ -181,7 +193,7 @@ function focusTask(task: DayTask) {
           @toggle="task => toggleTask(task, id => taskCue.play(id))"
           @edit-times="openEditTimes"
           @edit-adhoc="openEditAdhoc"
-          @delete-adhoc="removeAdhoc"
+          @delete-adhoc="handleDeleteAdhoc"
           @focus="focusTask"
           @add-adhoc="openAddAdhoc"
         />

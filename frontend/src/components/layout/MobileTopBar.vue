@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Bell } from 'lucide-vue-next'
 import BrandMark from '@/components/ui/BrandMark.vue'
@@ -9,10 +10,13 @@ import { timerText } from '@/utils/date'
 defineProps<{ unread: number }>()
 const emit = defineEmits<{ openInbox: [] }>()
 const route = useRoute()
+
+const el = ref<HTMLElement | null>(null)
+defineExpose({ el })
 </script>
 
 <template>
-  <header v-if="session" class="mobile-bar">
+  <header v-if="session" ref="el" class="mobile-bar">
     <RouterLink :to="{ name: 'today' }" aria-label="拾刻学习">
       <BrandMark compact />
     </RouterLink>

@@ -27,7 +27,9 @@ import { TIMER_MODE_LABELS, TIMER_QUICK_PRESETS } from '@/constants/study'
 import { preferences, today } from '@/stores/session'
 import {
   actTimer,
+  draftTask,
   finishTimer,
+  setDraftTask,
   startTimer,
   timer,
   timerBusy,
@@ -71,14 +73,30 @@ watch(
       if (!valid) return
       tasks.value = result.tasks
       taskError.value = ''
-      if (typeof selected === 'string' && tasks.value.some(t => t.id === selected)) taskId.value = selected
-      else if (!tasks.value.some(t => t.id === taskId.value)) taskId.value = ''
+      if (typeof selected === 'string') {
+        const matched = tasks.value.find(t => t.id === selected)
+        if (matched) {
+          taskId.value = matched.id
+          setDraftTask(matched)
+        }
+      } else if (draftTask.value && tasks.value.some(t => t.id === draftTask.value?.id)) {
+        taskId.value = draftTask.value.id
+      } else if (!tasks.value.some(t => t.id === taskId.value)) {
+        taskId.value = ''
+        if (draftTask.value) setDraftTask(null)
+      }
     } catch (e) {
       if (valid) taskError.value = (e as Error).message
     }
   },
   { immediate: true },
 )
+
+watch(taskId, id => {
+  if (timer.value) return
+  const matched = tasks.value.find(t => t.id === id) ?? null
+  if ((matched?.id ?? null) !== (draftTask.value?.id ?? null)) setDraftTask(matched)
+})
 
 watch(
   timer,

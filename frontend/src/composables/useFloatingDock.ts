@@ -8,25 +8,26 @@ const clamp = (value: number, max: number) => Math.min(Math.max(value, 0), max)
 
 export function useFloatingDock(options: {
   storageKey: string
+  open: Ref<boolean>
   layer: Ref<HTMLElement | null>
   trigger: Ref<HTMLButtonElement | null>
+  panel: Ref<HTMLElement | null>
+  topBar: () => HTMLElement | null
   bottomNav: () => HTMLElement | null
   routePath: () => string
-  onOpenChange: (open: boolean) => void
 }) {
-  const open = ref(false)
+  const open = options.open
   const settling = ref(false)
   const gap = 10
-  const dragThreshold = 7
+  const dragThreshold = 6
   const bounds = ref({ width: 0, height: 0, compact: false })
-  const size = computed(() => (bounds.value.compact ? 42 : 48))
+  const panelSize = ref({ width: 0, height: 0 })
+  const size = computed(() => (bounds.value.compact ? 44 : 48))
   const drag = ref<Point | null>(null)
 
   let gesture: Gesture | null = null
   let ignorePointerClick = false
   let resize: ResizeObserver | undefined
-
-  watch(open, value => options.onOpenChange(value), { flush: 'sync' })
 
   function loadDock(): Dock {
     try {
@@ -37,7 +38,7 @@ export function useFloatingDock(options: {
     } catch {
       /* ignore */
     }
-    return { edge: 'right', height: 1 }
+    return { edge: 'right', height: 0.78 }
   }
 
   const dock = ref<Dock>(loadDock())
@@ -53,37 +54,88 @@ export function useFloatingDock(options: {
     const { width, height, compact } = bounds.value
     const { x, y } = position.value
     const s = size.value
-    const w = Math.min(width, compact ? 268 : 304)
-    const left = dock.value.edge === 'left'
+    const w = Math.min(width, compact ? 226 : 236)
+    const h = panelSize.value.height || (compact ? 242 : 254)
+    const leftEdge = dock.value.edge === 'left'
     const beside = width >= w + s + gap
-    const above = beside ? y > maxY.value / 2 : y >= height - y - s
+    const orbCenterY = y + s / 2
+
+    if (beside) {
+      const panelLeft = leftEdge ? x + s + gap : x - w - gap
+      const clampedTop = clamp(orbCenterY - h / 2, Math.max(0, height - h))
+      const originY = clamp(orbCenterY - clampedTop, h)
+      return {
+        width: `${w}px`,
+        left: `${panelLeft}px`,
+        top: `${clampedTop}px`,
+        transformOrigin: `${leftEdge ? '0px' : `${w}px`} ${Math.round(originY)}px`,
+      }
+    }
+
+    const panelLeft = leftEdge ? 0 : Math.max(0, width - w)
+    const spaceAbove = y - gap
+    const spaceBelow = height - (y + s + gap)
+    const placeAbove = spaceAbove >= h || spaceAbove > spaceBelow
+    const panelTop = placeAbove
+      ? clamp(y - gap - h, Math.max(0, height - h))
+      : clamp(y + s + gap, Math.max(0, height - h))
+
     return {
       width: `${w}px`,
-      left: `${beside ? (left ? x + s + gap : x - w - gap) : left ? 0 : width - w}px`,
-      top: above ? undefined : `${beside ? y : y + s + gap}px`,
-      bottom: above ? `${height - y - (beside ? s : 0) + (beside ? 0 : gap)}px` : undefined,
+      left: `${panelLeft}px`,
+      top: `${panelTop}px`,
+      transformOrigin: `${leftEdge ? '24px' : `${w - 24}px`} ${placeAbove ? '100%' : '0%'}`,
     }
   })
+
+  function measurePanel() {
+    const el = options.panel.value
+    if (!el) return
+    const width = el.offsetWidth
+    const height = el.offsetHeight
+    if (width > 0 && height > 0 && (width !== panelSize.value.width || height !== panelSize.value.height)) {
+      panelSize.value = { width, height }
+    }
+  }
 
   function measure() {
     const frame = options.layer.value
     if (!frame) return
-    const navHeight = options.bottomNav()?.offsetHeight ?? 0
-    frame.style.setProperty('--clock-nav-height', `${navHeight}px`)
+    const topRect = options.topBar()?.getBoundingClientRect()
+    const navRect = options.bottomNav()?.getBoundingClientRect()
+    const topOffset = topRect && topRect.height > 0 ? Math.max(0, Math.ceil(topRect.bottom)) : 0
+    const bottomOffset = navRect && navRect.height > 0 ? Math.max(0, Math.ceil(window.innerHeight - navRect.top)) : 0
+    frame.style.setProperty('--clock-top-offset', `${topOffset}px`)
+    frame.style.setProperty('--clock-bottom-offset', `${bottomOffset}px`)
     const width = frame.clientWidth
     const height = frame.clientHeight
-    const compact = navHeight > 0
+    const compact = bottomOffset > 0 || window.innerWidth <= 768
+    measurePanel()
     if (width === bounds.value.width && height === bounds.value.height && compact === bounds.value.compact) return
     settling.value = false
     bounds.value = { width, height, compact }
   }
 
   watch(
-    options.bottomNav,
-    (nav, previous) => {
-      if (previous) resize?.unobserve(previous)
+    [options.topBar, options.bottomNav],
+    ([top, nav], [prevTop, prevNav]) => {
+      if (prevTop) resize?.unobserve(prevTop)
+      if (prevNav) resize?.unobserve(prevNav)
+      if (top) resize?.observe(top)
       if (nav) resize?.observe(nav)
       measure()
+    },
+    { flush: 'post' },
+  )
+
+  watch(
+    options.panel,
+    (el, prev) => {
+      if (prev) resize?.unobserve(prev)
+      if (el) {
+        resize?.observe(el)
+        measurePanel()
+      }
     },
     { flush: 'post' },
   )
@@ -136,12 +188,18 @@ export function useFloatingDock(options: {
   }
 
   function toggle(event: MouseEvent) {
-    if (ignorePointerClick && event.detail > 0) return
+    if (ignorePointerClick && event.detail > 0) {
+      ignorePointerClick = false
+      return
+    }
     open.value = !open.value
   }
 
   function onOutside(event: PointerEvent) {
-    if (open.value && event.target instanceof Node && !options.layer.value?.contains(event.target)) open.value = false
+    if (!open.value) return
+    const target = event.target
+    if (target instanceof Element && target.closest('[data-floating-clock-trigger]')) return
+    if (target instanceof Node && !options.layer.value?.contains(target)) open.value = false
   }
 
   function onEscape(event: KeyboardEvent) {
@@ -161,15 +219,19 @@ export function useFloatingDock(options: {
     measure()
     resize = new ResizeObserver(measure)
     if (options.layer.value) resize.observe(options.layer.value)
+    const top = options.topBar()
+    if (top) resize.observe(top)
     const nav = options.bottomNav()
     if (nav) resize.observe(nav)
+    window.addEventListener('resize', measure)
     document.addEventListener('pointerdown', onOutside, true)
     document.addEventListener('keydown', onEscape)
   })
 
   onUnmounted(() => {
-    if (open.value) options.onOpenChange(false)
+    open.value = false
     resize?.disconnect()
+    window.removeEventListener('resize', measure)
     document.removeEventListener('pointerdown', onOutside, true)
     document.removeEventListener('keydown', onEscape)
   })
