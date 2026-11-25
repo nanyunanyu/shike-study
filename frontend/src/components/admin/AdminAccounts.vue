@@ -269,9 +269,23 @@ function onActionDone(created: boolean) {
     padding: 11px 12px;
     gap: 8px;
   }
-  .acc-badges,
+  .acc-user {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .acc-ops {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    align-self: center;
+  }
+  .acc-badges {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
   .acc-last {
     grid-column: 1 / -1;
+    grid-row: 3;
   }
 }
 </style>

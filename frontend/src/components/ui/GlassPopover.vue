@@ -11,16 +11,36 @@ const style = ref<Record<string, string>>({})
 function updatePosition() {
   if (!root.value) return
   const rect = root.value.getBoundingClientRect()
-  const top = rect.bottom + 6
-  const spaceBelow = window.innerHeight - top
-  const openUp = spaceBelow < 220 && rect.top > 220
+  const margin = 10
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const menuW = menuRef.value?.offsetWidth || 184
+  const menuH = menuRef.value?.offsetHeight || 220
+
+  const topBelow = rect.bottom + 6
+  const topAbove = rect.top - 6 - menuH
+  const fitsBelow = topBelow + menuH <= vh - margin
+  const fitsAbove = topAbove >= margin
+  const openUp = !fitsBelow && (fitsAbove || rect.top > vh - rect.bottom)
+  const rawTop = openUp ? topAbove : topBelow
+  const top = Math.min(Math.max(margin, rawTop), Math.max(margin, vh - menuH - margin))
+
+  const rightAlignedLeft = rect.right - menuW
+  const leftAlignedLeft = rect.left
+  let rawLeft: number
+  if (props.align === 'right') {
+    rawLeft = rightAlignedLeft >= margin ? rightAlignedLeft : leftAlignedLeft
+  } else {
+    rawLeft = leftAlignedLeft + menuW <= vw - margin ? leftAlignedLeft : rightAlignedLeft
+  }
+  const left = Math.min(Math.max(margin, rawLeft), Math.max(margin, vw - menuW - margin))
+
   style.value = {
     position: 'fixed',
     zIndex: '130',
-    ...(openUp ? { bottom: `${window.innerHeight - rect.top + 6}px` } : { top: `${top}px` }),
-    ...(props.align === 'right'
-      ? { right: `${Math.max(10, window.innerWidth - rect.right)}px` }
-      : { left: `${Math.max(10, rect.left)}px` }),
+    top: `${Math.round(top)}px`,
+    left: `${Math.round(left)}px`,
+    transformOrigin: `${props.align === 'right' && rawLeft === rightAlignedLeft ? 'right' : 'left'} ${openUp ? 'bottom' : 'top'}`,
   }
 }
 
@@ -33,6 +53,7 @@ async function toggle() {
     window.addEventListener('scroll', close, true)
     window.addEventListener('resize', close)
     await nextTick()
+    updatePosition()
     menuRef.value?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
   } else {
     cleanup()
@@ -111,6 +132,7 @@ defineExpose({ close })
 }
 .glass-popover {
   min-width: 176px;
+  max-width: calc(100vw - 20px);
   padding: 5px;
   border-radius: var(--radius-md);
   display: grid;
