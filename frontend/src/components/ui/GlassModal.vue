@@ -80,6 +80,7 @@ onUnmounted(() => {
           :aria-label="title"
           tabindex="-1"
         >
+          <div v-if="drawer" class="sheet-grabber" aria-hidden="true"><span></span></div>
           <header class="glass-dialog-head">
             <div class="glass-dialog-titles">
               <h2>{{ title }}</h2>
@@ -140,6 +141,9 @@ onUnmounted(() => {
   max-height: 100%;
   height: 100%;
   border-radius: var(--radius-xl);
+}
+.sheet-grabber {
+  display: none;
 }
 .glass-dialog-head {
   display: flex;
@@ -203,17 +207,48 @@ onUnmounted(() => {
   transform: translateX(36px);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .glass-overlay {
-    padding: 10px;
+    padding: 12px 10px max(10px, env(safe-area-inset-bottom));
     align-items: end;
   }
   .glass-overlay.is-drawer {
-    padding: 8px;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 12px 10px max(10px, env(safe-area-inset-bottom));
   }
   .glass-dialog {
-    max-height: calc(100dvh - 20px);
+    max-height: calc(100dvh - 24px);
     border-radius: 22px;
+  }
+  .glass-dialog.drawer {
+    width: min(100%, 520px);
+    height: auto;
+    min-height: min(280px, 38dvh);
+    max-height: 74dvh;
+    border-radius: 24px;
+  }
+  .sheet-grabber {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0 2px;
+    flex: none;
+  }
+  .sheet-grabber span {
+    width: 36px;
+    height: 4px;
+    border-radius: var(--radius-pill);
+    background: var(--border-strong);
+  }
+  .glass-dialog.drawer .glass-dialog-head {
+    padding: 10px 18px 12px;
+  }
+  .glass-dialog.drawer .glass-dialog-body {
+    padding: 14px 18px 18px;
+  }
+  .sheet-slide-enter-from .glass-dialog,
+  .sheet-slide-leave-to .glass-dialog {
+    transform: translateY(36px);
   }
 }
 </style>

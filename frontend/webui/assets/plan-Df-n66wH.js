@@ -1,4 +1,4 @@
-import{c as t,aL as s}from"./index-C26UWtS4.js";/**
+import{c as t,aK as s}from"./index-BFnZQAws.js";/**
  * @license lucide-vue-next v0.468.0 - ISC
  *
  * This source code is licensed under the ISC license.

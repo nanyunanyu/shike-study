@@ -27,11 +27,12 @@ const emit = defineEmits<{
     </button>
     <button
       type="button"
-      class="icon-btn sm accent-btn"
+      class="icon-btn sm accent-btn focus-action-btn"
       :title="focusTitle ?? '为此任务开启专注'"
       @click="emit('focus', task)"
     >
-      <Play :size="14" />
+      <Play :size="13" />
+      <span class="focus-label">专注</span>
     </button>
     <button
       v-if="task.adhoc"
@@ -56,11 +57,32 @@ const emit = defineEmits<{
   background: var(--accent-soft);
   color: var(--accent);
 }
+.focus-label {
+  display: none;
+}
 @media (max-width: 768px) {
+  .task-actions {
+    gap: 5px;
+  }
   .task-actions .icon-btn.sm {
-    width: 26px;
-    height: 26px;
-    border-radius: 7px;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+  .task-actions .icon-btn.sm.focus-action-btn {
+    width: auto;
+    height: 28px;
+    padding: 0 10px;
+    gap: 4px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-soft);
+    border-color: var(--accent-border);
+    color: var(--accent);
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+  .focus-label {
+    display: inline;
   }
 }
 </style>
