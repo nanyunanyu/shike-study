@@ -2,10 +2,10 @@
 import { ref } from 'vue'
 import { ArrowRight, Eye, EyeOff, LogOut, Terminal } from 'lucide-vue-next'
 import { loginApi, logoutApi } from '@/api/auth'
-import BrandMark from '@/components/ui/BrandMark.vue'
 import { clearSession, session, setSession } from '@/stores/session'
 import AuthShowcase from './AuthShowcase.vue'
 import PasswordForm from './PasswordForm.vue'
+import TimepieceDial from './TimepieceDial.vue'
 
 defineProps<{ initialized: boolean }>()
 const emit = defineEmits<{ retry: [] }>()
@@ -44,12 +44,18 @@ async function logout() {
 
 <template>
   <main class="auth-stage">
+    <div class="auth-ambient" aria-hidden="true"></div>
+
     <div class="auth-shell">
       <AuthShowcase />
 
       <section class="auth-card-col">
-        <div class="auth-mobile-brand">
-          <BrandMark />
+        <div class="auth-mobile-hero">
+          <TimepieceDial size="compact" />
+          <div class="mobile-hero-copy">
+            <strong>拾刻学习</strong>
+            <span>拾起每一刻专注</span>
+          </div>
         </div>
 
         <div class="auth-card glass-card-solid">
@@ -86,7 +92,7 @@ async function logout() {
           <template v-else>
             <header class="auth-head">
               <h1>欢迎回来</h1>
-              <p class="muted">登录你的拾刻学习账号，延续今日专注节奏。</p>
+              <p class="muted">登录你的个人空间</p>
             </header>
             <form class="form-stack" @submit.prevent="login">
               <label class="field" for="login-username">
@@ -138,32 +144,60 @@ async function logout() {
 
 <style scoped>
 .auth-stage {
+  position: relative;
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 28px 24px;
+  overflow: hidden;
+}
+.auth-ambient {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(52% 46% at 24% 38%, var(--ambient-1), transparent 72%),
+    radial-gradient(46% 42% at 82% 20%, var(--ambient-2), transparent 70%),
+    radial-gradient(44% 40% at 62% 88%, var(--ambient-3), transparent 72%);
 }
 .auth-shell {
-  width: min(100%, 1080px);
+  position: relative;
+  z-index: 1;
+  width: min(100%, 940px);
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 440px);
-  gap: 32px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  gap: 44px;
   align-items: center;
 }
-.auth-mobile-brand {
+.auth-card-col {
+  width: 100%;
+  min-width: 0;
+}
+.auth-mobile-hero {
   display: none;
-  justify-content: center;
-  margin-bottom: 18px;
 }
 .auth-card {
-  padding: 32px 30px;
+  position: relative;
+  padding: 34px 32px;
   border-radius: var(--radius-xl);
   display: grid;
-  gap: 22px;
+  gap: 24px;
+  overflow: hidden;
+}
+.auth-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16%;
+  right: 16%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-border), transparent);
+  pointer-events: none;
 }
 .auth-head {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   justify-items: start;
 }
 .auth-head h1 {
@@ -172,8 +206,8 @@ async function logout() {
   letter-spacing: -0.025em;
 }
 .auth-head p {
-  font-size: 13.5px;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.5;
 }
 .auth-secondary {
   margin-top: -8px;
@@ -201,26 +235,68 @@ async function logout() {
 
 @media (max-width: 900px) {
   .auth-stage {
-    padding: 16px 14px;
+    padding: max(28px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+    align-content: center;
+  }
+  .auth-ambient {
+    background:
+      radial-gradient(88% 42% at 50% 8%, var(--accent-soft-strong), transparent 72%),
+      radial-gradient(64% 38% at 18% 24%, var(--ambient-1), transparent 70%),
+      radial-gradient(64% 38% at 86% 84%, var(--ambient-2), transparent 72%);
   }
   .auth-shell {
-    grid-template-columns: minmax(0, 420px);
+    grid-template-columns: minmax(0, 410px);
     justify-content: center;
+    gap: 0;
   }
-  .auth-mobile-brand {
-    display: flex;
-    margin-bottom: 14px;
+  .auth-mobile-hero {
+    display: grid;
+    justify-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+    padding-top: 8px;
+    text-align: center;
+  }
+  .mobile-hero-copy {
+    display: grid;
+    gap: 4px;
+  }
+  .mobile-hero-copy strong {
+    font-size: 22px;
+    font-weight: 740;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .mobile-hero-copy span {
+    font-size: 12.5px;
+    letter-spacing: 0.08em;
+    color: var(--ink-secondary);
   }
   .auth-card {
-    padding: 22px 18px;
-    gap: 18px;
-    border-radius: 20px;
+    padding: 24px 20px 26px;
+    gap: 20px;
+    border-radius: 24px;
+    background:
+      radial-gradient(120% 70% at 50% 0%, var(--accent-soft), transparent 58%),
+      var(--surface-glass-strong);
+    box-shadow:
+      var(--specular),
+      0 22px 48px -18px rgba(15, 23, 42, 0.2);
   }
   .auth-head h1 {
-    font-size: 21px;
+    font-size: 20px;
   }
   .auth-head p {
     font-size: 12.5px;
+  }
+  .auth-card :deep(input:not([type='checkbox']):not([type='radio'])) {
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .auth-card :deep(.btn.lg) {
+    min-height: 46px;
+    font-size: 14.5px;
+    border-radius: 14px;
   }
 }
 </style>

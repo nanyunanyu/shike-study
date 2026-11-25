@@ -330,4 +330,26 @@ defineExpose({ sync, showInbox, unread })
   overflow: hidden;
   text-overflow: ellipsis;
 }
+@media (max-width: 768px) {
+  .inbox-main {
+    align-items: flex-start;
+    padding: 8px 4px 8px 8px;
+    gap: 10px;
+  }
+  .inbox-meta {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .inbox-snippet {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.45;
+  }
+  .detail-body {
+    padding: 13px 14px;
+    font-size: 13.5px;
+  }
+}
 </style>

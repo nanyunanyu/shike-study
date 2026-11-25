@@ -198,12 +198,12 @@ function scrollToNow() {
                     <strong>{{ task.title }}</strong>
                     <span v-if="isCurrentSlot(task)" class="now-badge"><i></i>进行中</span>
                     <span v-else-if="currentTaskId === task.id && isToday" class="next-badge">即将开始</span>
-                    <span v-if="task.adhoc" class="adhoc-badge"><Sparkles :size="10" />临时</span>
                   </div>
                   <p v-if="task.note" class="task-note muted">{{ task.note }}</p>
                 </div>
                 <div class="task-meta-row">
                   <CategoryBadge :id="task.category" :name="task.category_name" />
+                  <span v-if="task.adhoc" class="adhoc-badge"><Sparkles :size="10" />临时</span>
                   <span v-if="task.estimate" class="tertiary meta-est tabular">约 {{ task.estimate }} 分钟</span>
                   <span v-if="task.override" class="accent-text meta-est">已调时段</span>
                 </div>
@@ -252,12 +252,14 @@ function scrollToNow() {
         <div class="list-main">
           <div class="task-title-line">
             <strong>{{ task.title }}</strong>
-            <span v-if="task.adhoc" class="adhoc-badge"><Sparkles :size="10" />临时</span>
           </div>
           <small v-if="task.note" class="muted">{{ task.note }}</small>
         </div>
 
-        <CategoryBadge :id="task.category" :name="task.category_name" />
+        <div class="list-meta">
+          <CategoryBadge :id="task.category" :name="task.category_name" />
+          <span v-if="task.adhoc" class="adhoc-badge"><Sparkles :size="10" />临时</span>
+        </div>
 
         <DayTaskActions
           v-if="editable"
@@ -547,12 +549,14 @@ function scrollToNow() {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  flex-shrink: 0;
   padding: 2px 7px;
   border-radius: var(--radius-pill);
   background: var(--warning-soft);
   color: var(--warning);
   font-size: 10.5px;
   font-weight: 630;
+  white-space: nowrap;
 }
 
 .task-actions {
@@ -601,6 +605,12 @@ function scrollToNow() {
   min-width: 0;
   display: grid;
   gap: 2px;
+}
+.list-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
 }
 
 @media (max-width: 768px) {
@@ -661,21 +671,20 @@ function scrollToNow() {
   }
   .task-card {
     display: grid;
-    grid-template-columns: 20px minmax(0, 1fr) auto;
-    grid-template-rows: auto auto;
-    align-items: center;
-    gap: 4px 8px;
-    padding: 8px 10px;
-    border-radius: 12px;
+    grid-template-columns: 20px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    align-items: start;
+    gap: 0 9px;
+    padding: 10px 11px;
+    border-radius: 14px;
   }
   .circle-check {
     grid-column: 1;
     grid-row: 1;
     width: 20px;
     height: 20px;
-    margin-top: 0;
     align-self: start;
-    margin-top: 1px;
+    margin-top: 2px;
   }
   .circle-check span {
     width: 19px;
@@ -685,20 +694,20 @@ function scrollToNow() {
     display: contents;
   }
   .task-head {
-    grid-column: 2 / -1;
+    grid-column: 2;
     grid-row: 1;
-    gap: 2px;
+    gap: 3px;
   }
   .task-title-line {
-    gap: 5px;
+    gap: 6px;
   }
   .task-title-line strong {
-    font-size: 13px;
-    line-height: 1.35;
+    font-size: 13.5px;
+    line-height: 1.4;
   }
   .task-note {
-    font-size: 11px;
-    line-height: 1.35;
+    font-size: 11.5px;
+    line-height: 1.42;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -708,29 +717,34 @@ function scrollToNow() {
     grid-column: 2;
     grid-row: 2;
     min-width: 0;
-    gap: 5px;
-    flex-wrap: nowrap;
-    overflow: hidden;
+    margin-top: 7px;
+    gap: 6px;
+    flex-wrap: wrap;
+    overflow: visible;
   }
   .meta-est {
     font-size: 11px;
     white-space: nowrap;
   }
   .task-card :deep(.task-actions) {
-    grid-column: 3;
-    grid-row: 2;
-    justify-self: end;
+    grid-column: 2;
+    grid-row: 3;
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px solid var(--border);
   }
   .clean-list {
-    gap: 6px;
+    gap: 7px;
   }
   .list-item {
-    grid-template-columns: 20px auto minmax(0, 1fr) auto;
-    grid-template-rows: auto auto;
-    align-items: center;
-    gap: 4px 8px;
-    padding: 8px 10px;
-    border-radius: 12px;
+    grid-template-columns: 20px auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    align-items: start;
+    gap: 0 9px;
+    padding: 10px 11px;
+    border-radius: 14px;
   }
   .list-item .circle-check {
     grid-column: 1;
@@ -739,29 +753,41 @@ function scrollToNow() {
   .list-main {
     grid-column: 2 / -1;
     grid-row: 1;
-    gap: 1px;
+    gap: 3px;
   }
   .list-main small {
-    white-space: nowrap;
+    font-size: 11.5px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 11px;
   }
   .list-time {
     grid-column: 2;
     grid-row: 2;
+    align-self: center;
+    margin-top: 7px;
     font-size: 11px;
     white-space: nowrap;
   }
-  .list-item :deep(.cat-badge) {
+  .list-meta {
     grid-column: 3;
     grid-row: 2;
     justify-self: start;
+    align-self: center;
+    margin-top: 7px;
+    flex-wrap: wrap;
+    max-width: 100%;
   }
   .list-item :deep(.task-actions) {
-    grid-column: 4;
-    grid-row: 2;
-    justify-self: end;
+    grid-column: 2 / -1;
+    grid-row: 3;
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px solid var(--border);
   }
 }
 </style>

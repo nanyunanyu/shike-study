@@ -202,3 +202,65 @@ export function playCompletionChime() {
     osc.stop(now + idx * 0.14 + 2.3)
   })
 }
+
+export function playCheckInChime(milestone = false) {
+  if (!soundState.chimeEnabled) return
+  const audioCtx = ensureContext()
+  if (!audioCtx) return
+
+  const now = audioCtx.currentTime
+  const filter = audioCtx.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.value = milestone ? 4200 : 3400
+  filter.connect(audioCtx.destination)
+
+  const notes = milestone
+    ? [523.25, 659.25, 783.99, 987.77, 1318.51]
+    : [523.25, 659.25, 783.99, 1174.66]
+  const step = milestone ? 0.072 : 0.068
+  const tail = milestone ? 1.55 : 1.05
+
+  notes.forEach((freq, idx) => {
+    const start = now + idx * step
+    const peak = (milestone ? 0.115 : 0.095) / (idx * 0.18 + 1)
+
+    const osc = audioCtx.createOscillator()
+    const gain = audioCtx.createGain()
+    osc.type = 'triangle'
+    osc.frequency.setValueAtTime(freq, start)
+    gain.gain.setValueAtTime(0.0001, start)
+    gain.gain.exponentialRampToValueAtTime(peak, start + 0.016)
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + tail)
+    osc.connect(gain).connect(filter)
+    osc.start(start)
+    osc.stop(start + tail + 0.06)
+
+    // Delicate crystal harmonic overtone
+    const shimmer = audioCtx.createOscillator()
+    const shimmerGain = audioCtx.createGain()
+    shimmer.type = 'sine'
+    shimmer.frequency.setValueAtTime(freq * 2, start)
+    shimmerGain.gain.setValueAtTime(0.0001, start)
+    shimmerGain.gain.exponentialRampToValueAtTime(peak * 0.24, start + 0.012)
+    shimmerGain.gain.exponentialRampToValueAtTime(0.0001, start + tail * 0.58)
+    shimmer.connect(shimmerGain).connect(filter)
+    shimmer.start(start)
+    shimmer.stop(start + tail * 0.62)
+  })
+
+  if (milestone) {
+    // Warm fifth pad shimmer for streak milestones
+    ;[261.63, 392.0].forEach(freq => {
+      const pad = audioCtx.createOscillator()
+      const padGain = audioCtx.createGain()
+      pad.type = 'sine'
+      pad.frequency.setValueAtTime(freq, now)
+      padGain.gain.setValueAtTime(0.0001, now)
+      padGain.gain.exponentialRampToValueAtTime(0.045, now + 0.12)
+      padGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.85)
+      pad.connect(padGain).connect(filter)
+      pad.start(now)
+      pad.stop(now + 1.92)
+    })
+  }
+}
