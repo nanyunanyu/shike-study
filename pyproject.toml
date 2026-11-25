@@ -1,0 +1,21 @@
+[project]
+name = "shike-study"
+version = "1.0.0"
+description = "拾刻学习 · 现代轻透极简学习打卡应用"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.121,<1",
+    "uvicorn>=0.34,<1",
+    "argon2-cffi>=23,<27",
+    "tzdata>=2025.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<10",
+    "httpx>=0.28,<1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

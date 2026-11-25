@@ -1,0 +1,4 @@
+fastapi>=0.121,<1
+uvicorn>=0.34,<1
+argon2-cffi>=23,<27
+tzdata>=2025.1
