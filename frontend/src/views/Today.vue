@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookMarked, CalendarDays, ChevronLeft, ChevronRight, NotebookPen } from 'lucide-vue-next'
 import ReviewCard from '@/components/reviews/ReviewCard.vue'
 import ShareCardModal from '@/components/share/ShareCardModal.vue'
 import AdhocTaskModal from '@/components/today/AdhocTaskModal.vue'
-import { chooseCheckInEffect, type CheckInEffect } from '@/components/today/CheckInCelebration.vue'
 import TimeOverrideModal from '@/components/today/TimeOverrideModal.vue'
 import TimelineBoard from '@/components/today/TimelineBoard.vue'
 import TodayFocusCard from '@/components/today/TodayFocusCard.vue'
@@ -15,13 +14,16 @@ import PageSkeleton from '@/components/ui/PageSkeleton.vue'
 import { useMotionCue } from '@/composables/useMotionCue'
 import { useTodayDay } from '@/composables/useTodayDay'
 import { preferences, session, today } from '@/stores/session'
+import { clearCheckInCelebration, triggerCheckInCelebration, updateCheckInCelebrationStreak } from '@/stores/ui'
 import type { AdhocTaskPayload, DayTask, Times } from '@/types'
+import { resolveStreakMilestone, type CelebrationOrigin } from '@/utils/celebrationEngine'
 import { currentHHMM, greetingForHour, labelDate } from '@/utils/date'
 import { buildSharePayloadFromDay } from '@/utils/sharePayload'
+import { playCheckInChime } from '@/utils/soundscape'
 
 const router = useRouter()
 const taskCue = useMotionCue<string>(320)
-const checkInCue = useMotionCue<CheckInEffect>(1450)
+const checkInPulse = useMotionCue<boolean>(560)
 
 const {
   selected,
@@ -70,11 +72,23 @@ const sharePayload = computed(() =>
     : null,
 )
 
-async function handleCheckIn() {
+async function handleCheckIn(origin: CelebrationOrigin) {
+  const prevStreak = currentStreak.value
   const outcome = await toggleCheckIn()
-  if (outcome === 'undone') checkInCue.clear()
-  else if (outcome === 'checked') checkInCue.play(chooseCheckInEffect())
+  if (outcome === 'undone') {
+    checkInPulse.clear()
+    clearCheckInCelebration()
+  } else if (outcome === 'checked') {
+    const nextStreak = Math.max(1, prevStreak + 1)
+    checkInPulse.play(true)
+    playCheckInChime(!!resolveStreakMilestone(nextStreak))
+    triggerCheckInCelebration({ origin, streak: nextStreak })
+  }
 }
+
+watch(currentStreak, streak => {
+  if (streak > 0) updateCheckInCelebrationStreak(streak)
+})
 
 function openEditTimes(task: DayTask) {
   timeTask.value = task
@@ -152,7 +166,7 @@ function focusTask(task: DayTask) {
         :busy="busy"
         :current-streak="currentStreak"
         :pinned-milestones="pinnedMilestones"
-        :celebration="checkInCue.cue.value"
+        :just-checked="!!checkInPulse.cue.value"
         @check-in="handleCheckIn"
         @share="shareOpen = true"
       />

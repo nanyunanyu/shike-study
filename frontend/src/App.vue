@@ -14,6 +14,7 @@ import { fetchMe, fetchStatus } from '@/api/auth'
 import { ApiError } from '@/api/client'
 import AuthGate from '@/components/auth/AuthGate.vue'
 import AppSidebar, { type NavItem } from '@/components/layout/AppSidebar.vue'
+import CheckInCelebration from '@/components/layout/CheckInCelebration.vue'
 import MobileDock from '@/components/layout/MobileDock.vue'
 import MobileTopBar from '@/components/layout/MobileTopBar.vue'
 import StudioToast from '@/components/layout/StudioToast.vue'
@@ -184,6 +185,7 @@ onUnmounted(() => {
     />
   </div>
 
+  <CheckInCelebration />
   <StudioToast ref="toastRef" />
 </template>
 

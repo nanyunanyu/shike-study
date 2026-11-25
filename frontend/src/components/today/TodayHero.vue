@@ -2,7 +2,7 @@
 import { CheckCircle2, Flag, Share2, Sparkles } from 'lucide-vue-next'
 import ProgressRing from '@/components/ui/ProgressRing.vue'
 import type { Milestone } from '@/types'
-import CheckInCelebration, { type CheckInEffect } from './CheckInCelebration.vue'
+import type { CelebrationOrigin } from '@/utils/celebrationEngine'
 
 defineProps<{
   complete: number
@@ -15,13 +15,23 @@ defineProps<{
   busy: boolean
   currentStreak: number
   pinnedMilestones: Milestone[]
-  celebration: CheckInEffect | null
+  justChecked?: boolean
 }>()
 
 const emit = defineEmits<{
-  checkIn: []
+  checkIn: [origin: CelebrationOrigin]
   share: []
 }>()
+
+function onCheckInClick(event: MouseEvent) {
+  const target = event.currentTarget as HTMLElement | null
+  const rect = target?.getBoundingClientRect()
+  const origin: CelebrationOrigin =
+    rect && (rect.width > 0 || rect.height > 0)
+      ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+      : { x: window.innerWidth / 2, y: window.innerHeight * 0.42 }
+  emit('checkIn', origin)
+}
 </script>
 
 <template>
@@ -52,12 +62,12 @@ const emit = defineEmits<{
           v-if="editable"
           type="button"
           class="btn lg pill checkin-btn"
-          :class="checked ? 'tinted' : 'primary'"
+          :class="[checked ? 'tinted' : 'primary', { 'is-celebrating': justChecked }]"
           :disabled="busy"
           :title="checked ? '点击可取消今日打卡' : '完成今日打卡'"
-          @click="emit('checkIn')"
+          @click="onCheckInClick"
         >
-          <CheckCircle2 :size="17" />
+          <CheckCircle2 :size="17" class="checkin-icon" />
           <span>{{ checked ? '今日已打卡' : '完成今日打卡' }}</span>
         </button>
         <span v-else-if="checked" class="pill success" style="padding: 7px 12px; font-size: 12.5px">
@@ -90,7 +100,6 @@ const emit = defineEmits<{
         </div>
       </div>
     </div>
-    <CheckInCelebration v-if="celebration" :key="celebration" :effect="celebration" />
   </section>
 </template>
 
@@ -151,6 +160,25 @@ const emit = defineEmits<{
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+.checkin-btn.is-celebrating {
+  animation: checkin-btn-pulse 0.54s var(--ease-spring);
+}
+.checkin-btn.is-celebrating .checkin-icon {
+  animation: check-pop 0.44s var(--ease-spring);
+}
+@keyframes checkin-btn-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--accent-ring);
+  }
+  45% {
+    transform: scale(1.035);
+    box-shadow: 0 0 0 10px transparent;
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 .hero-rings {
   display: flex;
