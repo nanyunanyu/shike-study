@@ -269,3 +269,41 @@ def test_admin_dispatches_and_inbox(tmp_path):
         read_res = user_client.put(f'/api/messages/{msg_id}/read', headers={'X-CSRF-Token': user_csrf})
         assert read_res.status_code == 200
         assert read_res.json()['read_at'] is not None
+
+
+def test_statistics_custom_date_range(tmp_path):
+    app, clock = make_client(tmp_path)
+    bootstrap_users(app, clock)
+    with TestClient(app) as client:
+        csrf = login(client, 'alice')
+        headers = {'X-CSRF-Token': csrf}
+        today = '2026-11-25'
+
+        res = client.post(
+            '/api/timer/start',
+            headers=headers,
+            json={'id': 'range-run-1', 'date': today, 'mode': 'pomodoro', 'minutes': 20},
+        )
+        assert res.status_code == 200
+        clock.advance(1200)
+        assert client.get('/api/timer').status_code == 200
+
+        custom = client.get('/api/statistics?start=2026-11-20&end=2026-11-25')
+        assert custom.status_code == 200, custom.text
+        body = custom.json()
+        assert body['custom_range']['start'] == '2026-11-20'
+        assert body['custom_range']['end'] == '2026-11-25'
+        assert len(body['custom_range']['days']) == 6
+        assert body['custom_range']['days'][-1]['seconds'] == 1200
+        assert body['custom_range']['has_previous'] is False
+
+        # Past window excluding today
+        past = client.get('/api/statistics?start=2026-11-10&end=2026-11-15')
+        assert past.status_code == 200
+        assert len(past.json()['custom_range']['days']) == 6
+        assert past.json()['categories'] == []
+
+        # Validation errors
+        assert client.get('/api/statistics?start=2026-11-20').status_code == 422
+        assert client.get('/api/statistics?start=2026-11-25&end=2026-11-20').status_code == 422
+        assert client.get('/api/statistics?start=2026-11-20&end=2026-11-28').status_code == 422

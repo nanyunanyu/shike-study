@@ -8,14 +8,41 @@ from .seed import BUILTINS
 from .store import encode, normalize_preferences, normalize_review, normalize_task, unpack_focus, unpack_plan
 
 
-def statistics(db, uid, today):
+MAX_RANGE_DAYS = 1095
+
+
+def statistics(db, uid, today, start_date=None, end_date=None):
     user = db.execute('SELECT preferences FROM users WHERE id=?', (uid,)).fetchone()
     prefs = normalize_preferences(json.loads(user['preferences']) if user else {})
-    first = (date.fromisoformat(today) - timedelta(days=364)).isoformat()
-    recent = (date.fromisoformat(today) - timedelta(days=29)).isoformat()
-    series, categories, checkins = {}, {}, set()
+    end = date.fromisoformat(today)
+    first = (end - timedelta(days=364)).isoformat()
+
+    if (start_date is None) != (end_date is None):
+        raise HTTPException(422, '请同时提供开始和结束日期')
+    custom_span = 0
+    if start_date is not None and end_date is not None:
+        if start_date.year < 1970:
+            raise HTTPException(422, '开始日期不能早于 1970 年')
+        if start_date > end_date:
+            raise HTTPException(422, '结束日期不能早于开始日期')
+        if end_date > end:
+            raise HTTPException(422, '结束日期不能晚于今天')
+        custom_span = (end_date - start_date).days + 1
+        if custom_span > MAX_RANGE_DAYS:
+            raise HTTPException(422, f'自定义日期范围最多支持 {MAX_RANGE_DAYS} 天')
+        cat_start, cat_end = start_date.isoformat(), end_date.isoformat()
+        prev_start = (start_date - timedelta(days=custom_span)).isoformat()
+        prev_end = (start_date - timedelta(days=1)).isoformat()
+    else:
+        cat_start = (end - timedelta(days=29)).isoformat()
+        cat_end = today
+        prev_start = prev_end = None
+
+    series, custom_series, categories, checkins = {}, {}, {}, set()
     perfect_days = 0
     reviews_count = 0
+    prev_seconds = 0
+    has_previous = False
 
     def bucket(item):
         return categories.setdefault(
@@ -35,9 +62,7 @@ def statistics(db, uid, today):
                 perfect_days += 1
         if has_review_content(review):
             reviews_count += 1
-        if day < first:
-            continue
-        series[day] = dict(
+        entry = dict(
             date=day,
             completed=completed,
             total=len(tasks),
@@ -45,7 +70,13 @@ def statistics(db, uid, today):
             seconds=0,
             checked=checked,
         )
-        if day >= recent:
+        if day >= first:
+            series[day] = dict(entry)
+        if start_date is not None and cat_start <= day <= cat_end:
+            custom_series[day] = dict(entry)
+        if prev_start is not None and prev_start <= day <= prev_end:
+            has_previous = True
+        if cat_start <= day <= cat_end:
             for item in tasks:
                 group = bucket(item)
                 group['name'], group['named_on'] = item['category_name'], day
@@ -65,7 +96,12 @@ def statistics(db, uid, today):
             today_focus_seconds += row['seconds']
         if day in series:
             series[day]['seconds'] += row['seconds']
-        if day >= recent:
+        if day in custom_series:
+            custom_series[day]['seconds'] += row['seconds']
+        if prev_start is not None and prev_start <= day <= prev_end:
+            prev_seconds += row['seconds']
+            has_previous = True
+        if cat_start <= day <= cat_end:
             item = json.loads(row['task']) if row['task'] else dict(category='@unbound', category_name='未绑定任务')
             group = bucket(item)
             if day > group['named_on']:
@@ -75,7 +111,6 @@ def statistics(db, uid, today):
     goal_threshold = prefs['daily_focus_goal_minutes'] * 60
     goal_days = sum(1 for total in daily_focus.values() if total >= goal_threshold)
 
-    end = date.fromisoformat(today)
     cursor = end if today in checkins else end - timedelta(days=1)
     streak = 0
     while cursor.isoformat() in checkins:
@@ -103,6 +138,31 @@ def statistics(db, uid, today):
         calendar.append(
             series.get(day, dict(date=day, completed=None, total=None, rate=None, seconds=None, checked=False))
         )
+
+    custom_range = None
+    if start_date is not None and end_date is not None:
+        range_days = [
+            custom_series.get(
+                (start_date + timedelta(days=offset)).isoformat(),
+                dict(
+                    date=(start_date + timedelta(days=offset)).isoformat(),
+                    completed=None,
+                    total=None,
+                    rate=None,
+                    seconds=None,
+                    checked=False,
+                ),
+            )
+            for offset in range(custom_span)
+        ]
+        custom_range = dict(
+            start=cat_start,
+            end=cat_end,
+            days=range_days,
+            previous_seconds=prev_seconds,
+            has_previous=has_previous,
+        )
+
     for group in categories.values():
         group.pop('named_on')
         group['rate'] = group['completed'] / group['total'] if group['total'] else None
@@ -121,7 +181,7 @@ def statistics(db, uid, today):
         completed_milestones=completed_milestones,
     )
 
-    return dict(
+    result = dict(
         today=today,
         streak=streak,
         longest_streak=longest_streak,
@@ -135,6 +195,9 @@ def statistics(db, uid, today):
         achievements=achievements,
         pinned_milestones=[item for item in milestones if item['pinned'] and not item['completed']][:3],
     )
+    if custom_range is not None:
+        result['custom_range'] = custom_range
+    return result
 
 
 def export_backup(db, user):

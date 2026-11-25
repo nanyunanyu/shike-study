@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { api, learningRevision, today } from '../state'
-import type { Milestone, Statistics } from '../types'
-import MilestonePanel from '../components/MilestonePanel.vue'
-import StudyReport from '../components/StudyReport.vue'
-import PageHeader from '../components/ui/PageHeader.vue'
-import PageSkeleton from '../components/ui/PageSkeleton.vue'
+import { fetchMilestones, fetchStatistics } from '@/api/stats'
+import MilestonePanel from '@/components/stats/MilestonePanel.vue'
+import StudyReport from '@/components/stats/StudyReport.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import PageSkeleton from '@/components/ui/PageSkeleton.vue'
+import { learningRevision, today } from '@/stores/session'
+import type { Milestone, Statistics } from '@/types'
 
 const stats = ref<Statistics | null>(null)
 const milestones = ref<Milestone[]>([])
@@ -16,7 +17,7 @@ async function load() {
   const id = ++revision
   error.value = ''
   try {
-    const [statsData, msData] = await Promise.all([api<Statistics>('/statistics'), api<Milestone[]>('/milestones')])
+    const [statsData, msData] = await Promise.all([fetchStatistics(), fetchMilestones()])
     if (id === revision) {
       stats.value = statsData
       milestones.value = msData
@@ -38,7 +39,7 @@ watch([learningRevision, today], load, { immediate: true })
     </p>
 
     <div v-if="stats" class="stats-stack">
-      <StudyReport :data="stats" />
+      <StudyReport :data="stats" :load-range="(start, end) => fetchStatistics({ start, end })" />
       <MilestonePanel :milestones="milestones" @changed="load" />
     </div>
     <PageSkeleton v-else-if="!error" layout="stats" />

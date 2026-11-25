@@ -557,9 +557,9 @@ def create_app(directory=None, clock=time.time):
         return timer_response(timing.act(db, user['id'], payload, timestamp), timestamp)
 
     @app.get('/api/statistics')
-    def stats(ctx=Depends(view, scope='function')):
+    def stats(start: date | None = None, end: date | None = None, ctx=Depends(view, scope='function')):
         db, user = ctx
-        return statistics(db, user['id'], today())
+        return statistics(db, user['id'], today(), start, end)
 
     @app.get('/api/backup')
     def backup(ctx=Depends(view, scope='function')):
@@ -757,10 +757,12 @@ def create_app(directory=None, clock=time.time):
         return get_plan(db, find_user(db, uid), today())
 
     @app.get('/api/admin/users/{uid}/statistics')
-    def admin_statistics(uid: int, ctx=Depends(admin_view, scope='function')):
+    def admin_statistics(
+        uid: int, start: date | None = None, end: date | None = None, ctx=Depends(admin_view, scope='function')
+    ):
         db, _ = ctx
         find_user(db, uid)
-        return statistics(db, uid, today())
+        return statistics(db, uid, today(), start, end)
 
     frontend_dir = ROOT.parent / 'frontend'
     dist = next(

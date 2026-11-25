@@ -1,16 +1,26 @@
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
-import { Check, Download, Globe, KeyRound, LogOut, Monitor, Moon, Palette as PaletteIcon, Settings2, Shield, Sun, Upload } from 'lucide-vue-next'
-import { api, clearSession, learningRevision, notify, PALETTES, preferences, session, today, updatePreferences } from '../state'
-import type { Appearance, BackupCounts, Palette, Preferences } from '../types'
-import PasswordForm from '../components/PasswordForm.vue'
-import TimerSettings from '../components/TimerSettings.vue'
-import GlassModal from '../components/ui/GlassModal.vue'
-import PageHeader from '../components/ui/PageHeader.vue'
+import { Download, Globe, KeyRound, LogOut, Settings2, Shield, Upload } from 'lucide-vue-next'
+import { logoutApi } from '@/api/auth'
+import { commitBackupApi, exportBackupApi, previewBackupApi } from '@/api/backup'
+import PasswordForm from '@/components/auth/PasswordForm.vue'
+import AppearanceSection from '@/components/me/AppearanceSection.vue'
+import BackupImportModal from '@/components/me/BackupImportModal.vue'
+import TimerSettings from '@/components/timer/TimerSettings.vue'
+import GlassModal from '@/components/ui/GlassModal.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import { usePreferencesActions } from '@/composables/usePreferencesActions'
+import { bumpLearningRevision, clearSession, preferences, session, today, updatePreferences } from '@/stores/session'
+import { notify } from '@/stores/ui'
+import type { Appearance, BackupCounts, Palette, Preferences } from '@/types'
+import { downloadJson, readJsonFile } from '@/utils/file'
 
 const router = useRouter()
-const busy = ref(false)
+const { saving: savingPrefs, savePreferences } = usePreferencesActions()
+
+const actionBusy = ref(false)
+const busy = computed(() => actionBusy.value || savingPrefs.value)
 const passwordOpen = ref(false)
 const settingOpen = ref(false)
 const importOpen = ref(false)
@@ -19,50 +29,28 @@ const picker = ref<HTMLInputElement | null>(null)
 const preview = shallowRef<{ token: string; counts: BackupCounts; backup: unknown; name: string } | null>(null)
 const importError = ref('')
 
-const appearances: ReadonlyArray<{ id: Appearance; label: string; icon: typeof Sun }> = [
-  { id: 'light', label: '浅色通透', icon: Sun },
-  { id: 'dark', label: '午夜深色', icon: Moon },
-  { id: 'system', label: '跟随系统', icon: Monitor },
-]
-
-async function saveSettings(value: Preferences, showMessage = true) {
-  busy.value = true
-  try {
-    updatePreferences(await api<Preferences>('/preferences', 'PUT', value))
-    settingOpen.value = false
-    if (showMessage) notify('偏好设置已保存')
-    return true
-  } catch (e) {
-    notify((e as Error).message, true)
-    return false
-  } finally {
-    busy.value = false
-  }
+async function saveTimerPrefs() {
+  if (await savePreferences(draft.value, '偏好设置已保存')) settingOpen.value = false
 }
 
 function chooseAppearance(appearance: Appearance) {
-  void saveSettings({ ...preferences.value, appearance }, false)
+  void savePreferences({ ...preferences.value, appearance })
 }
 
 function choosePalette(palette: Palette) {
-  void saveSettings({ ...preferences.value, palette }, false)
+  void savePreferences({ ...preferences.value, palette })
 }
 
 async function download() {
-  busy.value = true
+  actionBusy.value = true
   try {
-    const data = await api<unknown>('/backup')
-    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `shike-study-${today.value}.json`
-    link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    const data = await exportBackupApi()
+    downloadJson(`shike-study-${today.value}.json`, data)
     notify('学习数据已导出为 JSON')
   } catch (e) {
     notify((e as Error).message, true)
   } finally {
-    busy.value = false
+    actionBusy.value = false
   }
 }
 
@@ -71,59 +59,50 @@ async function readBackup(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
-  if (file.size > 15 * 1024 * 1024) {
-    notify('备份文件不能超过 15 MiB', true)
-    return
-  }
-  busy.value = true
+  actionBusy.value = true
   importError.value = ''
   preview.value = null
   try {
-    let backup: unknown
-    try {
-      backup = JSON.parse(await file.text())
-    } catch {
-      throw new Error('无法解析为有效的 JSON 文件')
-    }
-    const result = await api<{ token: string; counts: BackupCounts }>('/backup/preview', 'POST', backup)
+    const backup = await readJsonFile(file)
+    const result = await previewBackupApi(backup)
     preview.value = { ...result, backup, name: file.name }
     importOpen.value = true
   } catch (e) {
     notify((e as Error).message, true)
   } finally {
-    busy.value = false
+    actionBusy.value = false
   }
 }
 
 async function restore() {
   const value = preview.value
   if (!value) return
-  busy.value = true
+  actionBusy.value = true
   importError.value = ''
   try {
-    const result = await api<{ preferences: Preferences }>('/backup', 'PUT', { token: value.token, backup: value.backup })
+    const result = await commitBackupApi(value.token, value.backup)
     updatePreferences(result.preferences)
-    learningRevision.value++
+    bumpLearningRevision()
     importOpen.value = false
     preview.value = null
     notify('账号学习数据已成功恢复')
   } catch (e) {
     importError.value = (e as Error).message
   } finally {
-    busy.value = false
+    actionBusy.value = false
   }
 }
 
 async function logout() {
-  busy.value = true
+  actionBusy.value = true
   try {
-    await api('/auth/logout', 'POST')
+    await logoutApi()
     clearSession()
     await router.replace({ name: 'today' })
   } catch (e) {
     notify((e as Error).message, true)
   } finally {
-    busy.value = false
+    actionBusy.value = false
   }
 }
 </script>
@@ -132,7 +111,6 @@ async function logout() {
   <div class="page me-page">
     <PageHeader eyebrow="PREFERENCES & ACCOUNT" title="个人空间" subtitle="定制你的视觉氛围、专注目标与数据备份" />
 
-    <!-- Identity Banner -->
     <section class="profile-banner glass-card">
       <span class="avatar-circle big-avatar">{{ session?.user.username.slice(0, 1).toUpperCase() }}</span>
       <div class="profile-copy">
@@ -149,54 +127,14 @@ async function logout() {
     </section>
 
     <div class="me-bento">
-      <!-- Appearance & Palette Card -->
-      <section class="me-card glass-card">
-        <header class="section-title"><PaletteIcon :size="18" /><h2>外观与通透配色</h2></header>
+      <AppearanceSection
+        :appearance="preferences.appearance"
+        :palette="preferences.palette"
+        :busy="busy"
+        @choose-appearance="chooseAppearance"
+        @choose-palette="choosePalette"
+      />
 
-        <div class="appearance-block">
-          <div>
-            <strong>界面明暗模式</strong>
-            <p class="muted">切换浅色通透画布或午夜深色玻璃模式</p>
-          </div>
-          <div class="segmented" role="group" aria-label="明暗模式">
-            <button
-              v-for="item in appearances"
-              :key="item.id"
-              type="button"
-              :aria-pressed="preferences.appearance === item.id"
-              :disabled="busy"
-              @click="chooseAppearance(item.id)"
-            >
-              <component :is="item.icon" :size="14" />{{ item.label }}
-            </button>
-          </div>
-        </div>
-
-        <div class="palette-block">
-          <span class="field-label">主题氛围色</span>
-          <div class="palette-grid" role="group" aria-label="主题氛围色">
-            <button
-              v-for="item in PALETTES"
-              :key="item.id"
-              type="button"
-              class="palette-card"
-              :class="{ active: preferences.palette === item.id }"
-              :disabled="busy"
-              @click="choosePalette(item.id)"
-            >
-              <span class="swatch-orb" :style="{ background: `linear-gradient(135deg, ${item.swatch}, ${item.swatch2})` }">
-                <Check v-if="preferences.palette === item.id" :size="13" color="#fff" :stroke-width="3" />
-              </span>
-              <span class="palette-meta">
-                <strong>{{ item.label }}</strong>
-                <small class="tertiary">{{ item.desc }}</small>
-              </span>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <!-- Focus & Data Column -->
       <div class="me-side">
         <section class="me-card glass-card">
           <header class="section-title"><Settings2 :size="18" /><h2>专注与目标偏好</h2></header>
@@ -204,7 +142,8 @@ async function logout() {
             <div>
               <strong>番茄钟与每日目标</strong>
               <p class="muted tabular">
-                专注 {{ preferences.focus_minutes }}m · 休息 {{ preferences.break_minutes }}m · 每日目标 {{ Math.round(preferences.daily_focus_goal_minutes / 60 * 10) / 10 }}h
+                专注 {{ preferences.focus_minutes }}m · 休息 {{ preferences.break_minutes }}m · 每日目标
+                {{ Math.round((preferences.daily_focus_goal_minutes / 60) * 10) / 10 }}h
               </p>
             </div>
             <button type="button" class="btn secondary sm" :disabled="busy" @click="draft = { ...preferences }; settingOpen = true">
@@ -246,7 +185,7 @@ async function logout() {
         </section>
 
         <div class="logout-bar">
-          <button type="button" class="btn danger-ghost" :disabled="busy" @click="logout">
+          <button type="button" class="btn danger-ghost pill" :disabled="busy" @click="logout">
             <LogOut :size="15" />退出当前账号
           </button>
         </div>
@@ -258,23 +197,10 @@ async function logout() {
     </GlassModal>
 
     <GlassModal v-model="settingOpen" title="专注与目标设置" :busy="busy">
-      <TimerSettings v-model="draft" :busy="busy" @save="saveSettings(draft)" />
+      <TimerSettings v-model="draft" :busy="busy" @save="saveTimerPrefs" />
     </GlassModal>
 
-    <GlassModal v-model="importOpen" title="确认导入并覆盖学习数据" :busy="busy">
-      <div v-if="preview" class="form-stack">
-        <strong class="break-text">{{ preview.name }}</strong>
-        <p class="muted">
-          包含 {{ preview.counts.plans }} 个计划版本 · {{ preview.counts.days }} 天记录 · {{ preview.counts.focus }} 次专注 · {{ preview.counts.categories }} 个分类<template v-if="preview.counts.milestones"> · {{ preview.counts.milestones }} 个里程碑</template>
-        </p>
-        <p class="muted">确认后将覆盖当前账号在线学习数据；服务端会先自动保存一份回滚副本。</p>
-        <p v-if="importError" class="error-text" role="alert">{{ importError }}</p>
-        <div class="dialog-actions">
-          <button type="button" class="btn ghost" :disabled="busy" @click="importOpen = false">取消</button>
-          <button type="button" class="btn danger" :disabled="busy" @click="restore"><Upload :size="15" />确认覆盖导入</button>
-        </div>
-      </div>
-    </GlassModal>
+    <BackupImportModal v-model="importOpen" :preview="preview" :busy="busy" :error="importError" @confirm="restore" />
   </div>
 </template>
 
@@ -322,7 +248,6 @@ async function logout() {
 .profile-tz strong {
   font-size: 13px;
 }
-
 .me-bento {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
@@ -367,74 +292,10 @@ async function logout() {
   margin-top: 2px;
   font-size: 12px;
 }
-.appearance-block {
-  display: grid;
-  gap: 10px;
-  justify-items: start;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border);
-}
-.appearance-block strong {
-  display: block;
-  font-size: 14px;
-  font-weight: 620;
-}
-.appearance-block p {
-  margin-top: 2px;
-  font-size: 12px;
-}
-.palette-block {
-  display: grid;
-  gap: 10px;
-}
-.palette-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
-  gap: 10px;
-}
-.palette-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 12px;
-  border-radius: 14px;
-  background: var(--surface-subtle);
-  border: 1px solid var(--border);
-  text-align: left;
-  transition: background 0.16s, border-color 0.16s, transform 0.16s;
-}
-.palette-card:hover {
-  background: var(--surface-solid);
-}
-.palette-card.active {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
-}
-.swatch-orb {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  flex: none;
-  display: grid;
-  place-items: center;
-  box-shadow: 0 3px 10px -2px rgba(0, 0, 0, 0.25);
-}
-.palette-meta {
-  display: grid;
-  line-height: 1.25;
-}
-.palette-meta strong {
-  font-size: 13px;
-  font-weight: 630;
-}
-.palette-meta small {
-  font-size: 11px;
-}
 .logout-bar {
   display: flex;
   justify-content: flex-start;
 }
-
 @media (max-width: 900px) {
   .me-bento {
     grid-template-columns: 1fr;
@@ -466,24 +327,6 @@ async function logout() {
     padding: 15px 14px;
     gap: 12px;
   }
-  .appearance-block .segmented {
-    width: 100%;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .palette-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .palette-card {
-    padding: 9px 10px;
-    gap: 8px;
-    border-radius: 12px;
-  }
-  .swatch-orb {
-    width: 22px;
-    height: 22px;
-  }
   .setting-row {
     gap: 10px;
     padding: 10px 0;
@@ -491,9 +334,12 @@ async function logout() {
   .setting-row strong {
     font-size: 13.5px;
   }
+  .logout-bar {
+    justify-content: flex-start;
+  }
   .logout-bar .btn {
-    width: 100%;
     background: var(--danger-soft);
+    padding: 0 18px;
   }
 }
 </style>

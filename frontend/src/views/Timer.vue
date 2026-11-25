@@ -14,47 +14,39 @@ import {
   Timer as TimerIcon,
   Watch,
 } from 'lucide-vue-next'
+import { fetchDay } from '@/api/days'
+import AmbientMixer from '@/components/timer/AmbientMixer.vue'
+import ImmersiveTimer from '@/components/timer/ImmersiveTimer.vue'
+import TimerSettings from '@/components/timer/TimerSettings.vue'
+import GlassModal from '@/components/ui/GlassModal.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import PageSkeleton from '@/components/ui/PageSkeleton.vue'
+import ProgressRing from '@/components/ui/ProgressRing.vue'
+import { usePreferencesActions } from '@/composables/usePreferencesActions'
+import { TIMER_MODE_LABELS, TIMER_QUICK_PRESETS } from '@/constants/study'
+import { preferences, today } from '@/stores/session'
 import {
   actTimer,
-  api,
   finishTimer,
-  notify,
-  preferences,
   startTimer,
   timer,
   timerBusy,
-  timerModeLabels,
   timerProgress,
   timerReady,
   timerSeconds,
   timerStatus,
-  timerText,
-  today,
-  updatePreferences,
-} from '../state'
-import type { Day, DayTask, Mode, Preferences } from '../types'
-import AmbientMixer from '../components/AmbientMixer.vue'
-import ImmersiveTimer from '../components/ImmersiveTimer.vue'
-import TimerSettings from '../components/TimerSettings.vue'
-import GlassModal from '../components/ui/GlassModal.vue'
-import PageHeader from '../components/ui/PageHeader.vue'
-import PageSkeleton from '../components/ui/PageSkeleton.vue'
-import ProgressRing from '../components/ui/ProgressRing.vue'
+} from '@/stores/timer'
+import type { DayTask, Mode, Preferences } from '@/types'
+import { timerText } from '@/utils/date'
 
 const route = useRoute()
+const { saving: settingsBusy, savePreferences } = usePreferencesActions()
 
 const modes = [
   { value: 'pomodoro', icon: TimerIcon },
   { value: 'stopwatch', icon: Watch },
   { value: 'countdown', icon: Hourglass },
 ] as const
-
-const quickPresets = [
-  { minutes: 15, label: '15m 冲刺' },
-  { minutes: 25, label: '25m 经典' },
-  { minutes: 45, label: '45m 深度' },
-  { minutes: 60, label: '60m 模考' },
-]
 
 const mode = ref<Mode>('pomodoro')
 const selectedMinutes = ref<number | null>(null)
@@ -63,7 +55,6 @@ const tasks = ref<DayTask[]>([])
 const taskId = ref('')
 const taskError = ref('')
 const settingsOpen = ref(false)
-const settingsBusy = ref(false)
 const draft = ref<Preferences>({ ...preferences.value })
 const immersive = ref(false)
 
@@ -76,7 +67,7 @@ watch(
     })
     if (!date) return
     try {
-      const result = await api<Day>(`/days/${date}`)
+      const result = await fetchDay(date)
       if (!valid) return
       tasks.value = result.tasks
       taskError.value = ''
@@ -130,19 +121,12 @@ function openSettings() {
   settingsOpen.value = true
 }
 
-async function saveSettings() {
-  settingsBusy.value = true
-  try {
-    const value = await api<Preferences>('/preferences', 'PUT', draft.value)
-    updatePreferences(value)
-    countdownMinutes.value = value.countdown_minutes
+async function handleSaveSettings() {
+  const updated = await savePreferences(draft.value, '计时设置已更新')
+  if (updated) {
+    countdownMinutes.value = updated.countdown_minutes
     selectedMinutes.value = null
     settingsOpen.value = false
-    notify('计时设置已更新')
-  } catch (e) {
-    notify((e as Error).message, true)
-  } finally {
-    settingsBusy.value = false
   }
 }
 </script>
@@ -161,7 +145,6 @@ async function saveSettings() {
     <PageSkeleton v-if="!timerReady" layout="timer" />
 
     <div v-else class="timer-bento">
-      <!-- Main Studio Dial Card -->
       <section class="dial-card glass-card">
         <div class="dial-top">
           <div class="segmented" role="group" aria-label="计时模式">
@@ -173,7 +156,7 @@ async function saveSettings() {
               :aria-pressed="activeMode === item.value"
               @click="mode = item.value"
             >
-              <component :is="item.icon" :size="14" />{{ timerModeLabels[item.value] }}
+              <component :is="item.icon" :size="14" />{{ TIMER_MODE_LABELS[item.value] }}
             </button>
           </div>
           <span class="pill accent">{{ timerStatus }}</span>
@@ -197,10 +180,9 @@ async function saveSettings() {
           </div>
         </div>
 
-        <!-- Quick Presets (when idle) -->
         <div v-if="!timer && mode !== 'stopwatch'" class="presets-bar">
           <button
-            v-for="preset in quickPresets"
+            v-for="preset in TIMER_QUICK_PRESETS"
             :key="preset.minutes"
             type="button"
             class="preset-chip"
@@ -211,7 +193,6 @@ async function saveSettings() {
           </button>
         </div>
 
-        <!-- Primary Controls -->
         <div class="dial-actions">
           <template v-if="timer?.stage === 'offer'">
             <button type="button" class="btn primary lg pill" :disabled="timerBusy" @click="actTimer('start_break')">
@@ -248,7 +229,6 @@ async function saveSettings() {
         </div>
       </section>
 
-      <!-- Right Panel: Task Binding + Ambient Soundscape -->
       <aside class="timer-side">
         <section class="side-card glass-card">
           <header class="section-title"><Link2 :size="17" /><h2>关联今日任务</h2></header>
@@ -273,7 +253,7 @@ async function saveSettings() {
     </div>
 
     <GlassModal v-model="settingsOpen" title="计时偏好设置" :busy="settingsBusy">
-      <TimerSettings v-model="draft" :busy="settingsBusy" @save="saveSettings" />
+      <TimerSettings v-model="draft" :busy="settingsBusy" @save="handleSaveSettings" />
     </GlassModal>
 
     <ImmersiveTimer
@@ -421,10 +401,6 @@ async function saveSettings() {
   }
 }
 @media (max-width: 768px) {
-  .timer-page :deep(.page-header-actions) {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .dial-card {
     padding: 16px 14px 20px;
     gap: 15px;
@@ -454,12 +430,13 @@ async function saveSettings() {
     font-size: 35px;
   }
   .presets-bar {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 7px;
   }
   .preset-chip {
-    padding: 7px 10px;
+    padding: 6px 11px;
     font-size: 12px;
     text-align: center;
   }
@@ -467,8 +444,8 @@ async function saveSettings() {
     width: 100%;
   }
   .start-cta {
-    width: 100%;
-    min-width: 0;
+    width: auto;
+    min-width: 164px;
   }
   .timer-side {
     gap: 14px;

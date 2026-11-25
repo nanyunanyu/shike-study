@@ -1,5 +1,6 @@
-import { duration, labelDate, MOODS } from '../state'
-import type { Mood, Palette } from '../types'
+import { MOODS } from '@/constants/study'
+import type { Mood, Palette } from '@/types'
+import { duration, labelDate } from '@/utils/date'
 
 export interface ShareCardPayload {
   date: string

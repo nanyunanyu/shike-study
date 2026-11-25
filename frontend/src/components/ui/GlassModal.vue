@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onUnmounted, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
-import { activeDialogs } from '../../messages'
+import { activeDialogs } from '@/stores/ui'
 
 const props = withDefaults(
   defineProps<{
