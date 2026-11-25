@@ -762,9 +762,20 @@ def create_app(directory=None, clock=time.time):
         find_user(db, uid)
         return statistics(db, uid, today())
 
-    dist = ROOT / 'webui'
-    if not (dist / 'index.html').is_file():
-        dist = ROOT / 'dist'
+    frontend_dir = ROOT.parent / 'frontend'
+    dist = next(
+        (
+            candidate
+            for candidate in (
+                frontend_dir / 'webui',
+                frontend_dir / 'dist',
+                ROOT / 'webui',
+                ROOT / 'dist',
+            )
+            if (candidate / 'index.html').is_file()
+        ),
+        frontend_dir / 'webui',
+    )
     if (dist / 'assets').is_dir():
         app.mount('/assets', StaticFiles(directory=dist / 'assets'), name='assets')
 
@@ -776,7 +787,11 @@ def create_app(directory=None, clock=time.time):
             return FileResponse(dist / 'favicon.svg')
         if (dist / 'index.html').is_file():
             return FileResponse(dist / 'index.html', headers={'Cache-Control': 'no-cache'})
-        return Response('前端尚未构建，请先运行 npm install && npm run build。', media_type='text/plain', status_code=503)
+        return Response(
+            '前端尚未构建，请先在 frontend 目录运行 npm install && npm run build。',
+            media_type='text/plain',
+            status_code=503,
+        )
 
     return app
 

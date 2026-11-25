@@ -11,14 +11,24 @@
 - **复盘手账 & 打卡分享海报**：心情与 5 分专注度评分、独立「复盘手账」历史时间线检索、基于高清 Canvas 的一键学习打卡海报生成与下载。
 - **完整多账号、备份与后台**：Argon2id 密码哈希、CSRF 防护、每日 SQLite 快照、V1/V2 备份导入导出、超级管理员账号管理与批量定时站内消息。
 
+## 目录结构
+
+- `frontend/`：Vue 3 + TypeScript + Vite 前端源码与构建产物（`webui/`）
+- `backend/`：FastAPI + SQLite 后端服务（`study/`）、测试（`tests/`）、运行数据（`data/`）与部署入口（`server.py`）
+
 ## 快速启动
 
 需要 Node.js 20+、Python 3.11+ 和 `uv`：
 
 ```sh
-uv sync
+# 1. 构建前端
+cd frontend
 npm install
 npm run build
+
+# 2. 启动后端
+cd ../backend
+uv sync
 uv run python -m study.cli init-admin
 uv run python -m study.cli serve
 ```
@@ -28,5 +38,6 @@ uv run python -m study.cli serve
 本地演示预览可快速初始化含示例数据的本地环境：
 
 ```sh
+cd backend
 uv run python -m study.cli seed-demo --port 8765
 ```
