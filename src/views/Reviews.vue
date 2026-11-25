@@ -10,6 +10,7 @@ import PageSkeleton from '../components/ui/PageSkeleton.vue'
 const items = ref<ReviewTimelineItem[]>([])
 const summary = ref<ReviewTimelinePage['summary']>({ total_reviews: 0, avg_focus_score: null, mood_counts: {} })
 const nextBefore = ref<string | null>(null)
+const hasLoaded = ref(false)
 const loading = ref(true)
 const error = ref('')
 
@@ -43,6 +44,7 @@ async function load(append = false) {
     nextBefore.value = page.next_before
     summary.value = page.summary
     if (statsData) streak.value = statsData.streak
+    hasLoaded.value = true
   } catch (e) {
     if (version === serial) error.value = (e as Error).message
   } finally {
@@ -99,121 +101,128 @@ const sharePayload = computed(() =>
   <div class="page reviews-page">
     <PageHeader eyebrow="REFLECTION JOURNAL" title="复盘手账" subtitle="按时间线回溯每日沉淀、心境变化与学习方法迭代" />
 
-    <!-- Summary Bento Strip -->
-    <section class="summary-strip">
-      <div class="glass-card stat-tile">
-        <span class="tile-label"><BookMarked :size="14" class="accent-text" />累计复盘</span>
-        <strong class="tabular">{{ summary.total_reviews }} <small class="muted">篇</small></strong>
-      </div>
-      <div class="glass-card stat-tile">
-        <span class="tile-label"><Star :size="14" class="accent-text" />平均专注度</span>
-        <strong class="tabular">{{ summary.avg_focus_score ?? '—' }} <small v-if="summary.avg_focus_score" class="muted">/ 5.0</small></strong>
-      </div>
-      <div class="glass-card stat-tile">
-        <span class="tile-label"><Sparkles :size="14" class="accent-text" />常见心境</span>
-        <strong>{{ topMood ? `${topMood.glyph} ${topMood.label}` : '暂无记录' }}</strong>
-      </div>
-    </section>
-
-    <!-- Filter Bar -->
-    <section class="filter-bar glass-card">
-      <div class="filter-top-row">
-        <label class="search-box">
-          <Search :size="15" class="tertiary" />
-          <input v-model="searchQuery" type="search" class="bare-input" placeholder="检索收获、随笔、明日优先或日期…" />
-        </label>
-        <select v-model="issueFilter" class="issue-select" aria-label="按阻力标签筛选">
-          <option value="">全部阻力标签</option>
-          <option v-for="iss in REVIEW_ISSUES" :key="iss" :value="iss">{{ iss }}</option>
-        </select>
-      </div>
-
-      <div class="mood-filters" role="group" aria-label="按心情筛选">
-        <button type="button" class="filter-chip" :class="{ active: moodFilter === '' }" @click="moodFilter = ''">全部心境</button>
-        <button
-          v-for="m in MOODS"
-          :key="m.id"
-          type="button"
-          class="filter-chip"
-          :class="{ active: moodFilter === m.id }"
-          @click="moodFilter = moodFilter === m.id ? '' : m.id"
-        >
-          {{ m.glyph }} {{ m.label }}
-        </button>
-      </div>
-    </section>
-
-    <p v-if="error" class="error-text" role="alert">
+    <p v-if="error && !hasLoaded" class="error-text" role="alert">
       {{ error }} <button type="button" class="btn ghost sm" @click="load(false)">重试</button>
     </p>
-    <PageSkeleton v-else-if="loading && !items.length" layout="reviews" />
+    <PageSkeleton v-else-if="!hasLoaded && loading" layout="reviews" />
 
-    <div v-else-if="!items.length" class="glass-card empty-journal">
-      <BookMarked :size="28" class="tertiary" />
-      <h3>{{ moodFilter || issueFilter || searchQuery ? '没有符合筛选条件的复盘记录' : '尚未留下复盘手账' }}</h3>
-      <p class="muted">在「今日」页面填写状态、收获或随笔并保存后，会自动收录在这里。</p>
-    </div>
+    <template v-else>
+      <!-- Summary Bento Strip -->
+      <section class="summary-strip">
+        <div class="glass-card stat-tile">
+          <span class="tile-label"><BookMarked :size="14" class="accent-text" />累计复盘</span>
+          <strong class="tabular">{{ summary.total_reviews }} <small class="muted">篇</small></strong>
+        </div>
+        <div class="glass-card stat-tile">
+          <span class="tile-label"><Star :size="14" class="accent-text" />平均专注度</span>
+          <strong class="tabular">{{ summary.avg_focus_score ?? '—' }} <small v-if="summary.avg_focus_score" class="muted">/ 5.0</small></strong>
+        </div>
+        <div class="glass-card stat-tile">
+          <span class="tile-label"><Sparkles :size="14" class="accent-text" />常见心境</span>
+          <strong>{{ topMood ? `${topMood.glyph} ${topMood.label}` : '暂无记录' }}</strong>
+        </div>
+      </section>
 
-    <div v-else class="journal-grid">
-      <article v-for="entry in items" :key="entry.date" class="journal-card glass-card">
-        <header class="journal-head">
-          <div>
-            <h3>{{ labelDate(entry.date, 'long') }}</h3>
-            <span class="tertiary tabular">{{ entry.date }}</span>
+      <!-- Filter Bar -->
+      <section class="filter-bar glass-card">
+        <div class="filter-top-row">
+          <label class="search-box">
+            <Search :size="15" class="tertiary" />
+            <input v-model="searchQuery" type="search" class="bare-input" placeholder="检索收获、随笔、明日优先或日期…" />
+          </label>
+          <select v-model="issueFilter" class="issue-select" aria-label="按阻力标签筛选">
+            <option value="">全部阻力标签</option>
+            <option v-for="iss in REVIEW_ISSUES" :key="iss" :value="iss">{{ iss }}</option>
+          </select>
+        </div>
+
+        <div class="mood-filters" role="group" aria-label="按心情筛选">
+          <button type="button" class="filter-chip" :class="{ active: moodFilter === '' }" @click="moodFilter = ''">全部心境</button>
+          <button
+            v-for="m in MOODS"
+            :key="m.id"
+            type="button"
+            class="filter-chip"
+            :class="{ active: moodFilter === m.id }"
+            @click="moodFilter = moodFilter === m.id ? '' : m.id"
+          >
+            {{ m.glyph }} {{ m.label }}
+          </button>
+        </div>
+      </section>
+
+      <p v-if="error" class="error-text" role="alert">
+        {{ error }} <button type="button" class="btn ghost sm" @click="load(false)">重试</button>
+      </p>
+      <PageSkeleton v-else-if="loading && !items.length" layout="reviews-cards" />
+
+      <div v-else-if="!items.length" class="glass-card empty-journal">
+        <BookMarked :size="28" class="tertiary" />
+        <h3>{{ moodFilter || issueFilter || searchQuery ? '没有符合筛选条件的复盘记录' : '尚未留下复盘手账' }}</h3>
+        <p class="muted">在「今日」页面填写状态、收获或随笔并保存后，会自动收录在这里。</p>
+      </div>
+
+      <div v-else class="journal-grid">
+        <article v-for="entry in items" :key="entry.date" class="journal-card glass-card">
+          <header class="journal-head">
+            <div>
+              <h3>{{ labelDate(entry.date, 'long') }}</h3>
+              <span class="tertiary tabular">{{ entry.date }}</span>
+            </div>
+            <div class="journal-head-right">
+              <span v-if="entry.checked_at" class="pill success"><CheckCircle2 :size="12" />已打卡</span>
+              <button type="button" class="icon-btn sm" title="生成当日打卡海报" @click="openShare(entry)">
+                <Share2 :size="15" />
+              </button>
+            </div>
+          </header>
+
+          <div class="journal-metrics">
+            <span class="pill tabular">完成 {{ entry.completed }}/{{ entry.total }}</span>
+            <span class="pill tabular"><TimerIcon :size="12" />{{ duration(entry.focus_seconds) }}</span>
+            <span v-if="moodInfo(entry.review.mood)" class="pill accent">
+              {{ moodInfo(entry.review.mood)?.glyph }} {{ moodInfo(entry.review.mood)?.label }}
+            </span>
+            <span v-if="entry.review.focus_score" class="pill tabular">
+              ★ {{ entry.review.focus_score }}.0
+            </span>
           </div>
-          <div class="journal-head-right">
-            <span v-if="entry.checked_at" class="pill success"><CheckCircle2 :size="12" />已打卡</span>
-            <button type="button" class="icon-btn sm" title="生成当日打卡海报" @click="openShare(entry)">
-              <Share2 :size="15" />
-            </button>
+
+          <blockquote v-if="entry.review.reflection" class="journal-quote">
+            {{ entry.review.reflection }}
+          </blockquote>
+
+          <div v-if="entry.review.effective.some(t => t.trim())" class="journal-section">
+            <small class="field-label">有效收获</small>
+            <ul class="bullet-list">
+              <li v-for="(line, i) in entry.review.effective.filter(t => t.trim())" :key="i">{{ line }}</li>
+            </ul>
           </div>
-        </header>
 
-        <div class="journal-metrics">
-          <span class="pill tabular">完成 {{ entry.completed }}/{{ entry.total }}</span>
-          <span class="pill tabular"><TimerIcon :size="12" />{{ duration(entry.focus_seconds) }}</span>
-          <span v-if="moodInfo(entry.review.mood)" class="pill accent">
-            {{ moodInfo(entry.review.mood)?.glyph }} {{ moodInfo(entry.review.mood)?.label }}
-          </span>
-          <span v-if="entry.review.focus_score" class="pill tabular">
-            ★ {{ entry.review.focus_score }}.0
-          </span>
-        </div>
+          <div v-if="entry.review.issues.length || entry.review.other" class="journal-tags">
+            <span v-for="iss in entry.review.issues" :key="iss" class="pill warning">{{ iss }}</span>
+            <span v-if="entry.review.other" class="muted" style="font-size: 12px">{{ entry.review.other }}</span>
+          </div>
 
-        <blockquote v-if="entry.review.reflection" class="journal-quote">
-          {{ entry.review.reflection }}
-        </blockquote>
+          <div v-if="entry.review.priorities.some(t => t.trim())" class="journal-section">
+            <small class="field-label">次日优先</small>
+            <ul class="bullet-list subtle">
+              <li v-for="(line, i) in entry.review.priorities.filter(t => t.trim())" :key="i">{{ line }}</li>
+            </ul>
+          </div>
 
-        <div v-if="entry.review.effective.some(t => t.trim())" class="journal-section">
-          <small class="field-label">有效收获</small>
-          <ul class="bullet-list">
-            <li v-for="(line, i) in entry.review.effective.filter(t => t.trim())" :key="i">{{ line }}</li>
-          </ul>
-        </div>
+          <p v-if="entry.review.adjustment" class="journal-adjust muted">
+            <strong>策略微调：</strong>{{ entry.review.adjustment }}
+          </p>
+        </article>
+      </div>
 
-        <div v-if="entry.review.issues.length || entry.review.other" class="journal-tags">
-          <span v-for="iss in entry.review.issues" :key="iss" class="pill warning">{{ iss }}</span>
-          <span v-if="entry.review.other" class="muted" style="font-size: 12px">{{ entry.review.other }}</span>
-        </div>
-
-        <div v-if="entry.review.priorities.some(t => t.trim())" class="journal-section">
-          <small class="field-label">次日优先</small>
-          <ul class="bullet-list subtle">
-            <li v-for="(line, i) in entry.review.priorities.filter(t => t.trim())" :key="i">{{ line }}</li>
-          </ul>
-        </div>
-
-        <p v-if="entry.review.adjustment" class="journal-adjust muted">
-          <strong>策略微调：</strong>{{ entry.review.adjustment }}
-        </p>
-      </article>
-    </div>
-
-    <div v-if="nextBefore" class="load-more">
-      <button type="button" class="btn secondary pill" :disabled="loading" @click="load(true)">
-        {{ loading ? '正在加载…' : '加载更早复盘' }}
-      </button>
-    </div>
+      <div v-if="nextBefore" class="load-more">
+        <button type="button" class="btn secondary pill" :disabled="loading" @click="load(true)">
+          {{ loading ? '正在加载…' : '加载更早复盘' }}
+        </button>
+      </div>
+    </template>
 
     <ShareCardModal v-model="shareOpen" :payload="sharePayload" />
   </div>

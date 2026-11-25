@@ -5,6 +5,7 @@ export type SkeletonLayout =
   | 'timer'
   | 'plan'
   | 'reviews'
+  | 'reviews-cards'
   | 'stats'
   | 'admin-overview'
   | 'accounts'
@@ -157,6 +158,19 @@ withDefaults(defineProps<{ layout?: SkeletonLayout }>(), { layout: 'today' })
           <span class="sk-box" style="width: 78%; height: 12px"></span>
           <span class="sk-box" style="width: 60%; height: 12px"></span>
         </div>
+      </div>
+    </div>
+
+    <!-- Reviews Cards Only (subsequent filter reloads) -->
+    <div v-else-if="layout === 'reviews-cards'" class="sk-2-grid" aria-hidden="true">
+      <div v-for="i in 4" :key="i" class="glass-card sk-panel">
+        <div class="sk-between">
+          <span class="sk-box sk-h2"></span>
+          <span class="sk-box sk-pill" style="width: 62px"></span>
+        </div>
+        <span class="sk-box" style="width: 100%; height: 54px; border-radius: 12px"></span>
+        <span class="sk-box" style="width: 78%; height: 12px"></span>
+        <span class="sk-box" style="width: 60%; height: 12px"></span>
       </div>
     </div>
 
